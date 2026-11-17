@@ -1,7 +1,9 @@
 import logging
+
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
 
 def send_payment_verification_sms(booking, payment):
     """
@@ -35,8 +37,9 @@ def send_payment_verification_sms(booking, payment):
         "room_number": room.room_number,
         "amount_verified": float(payment.amount),
         "message": message,
-        "sent_at": timezone.now().isoformat()
+        "sent_at": timezone.now().isoformat(),
     }
+
 
 def send_payment_rejection_sms(booking, payment, reason=""):
     """
@@ -59,5 +62,5 @@ def send_payment_rejection_sms(booking, payment, reason=""):
         "recipient_name": guest.full_name,
         "booking_reference": booking.booking_reference,
         "message": message,
-        "sent_at": timezone.now().isoformat()
+        "sent_at": timezone.now().isoformat(),
     }

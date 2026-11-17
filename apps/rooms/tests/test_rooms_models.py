@@ -1,23 +1,18 @@
 from decimal import Decimal
+
 from django.test import TestCase
-from apps.rooms.models import Room, RoomType, Amenity, RoomStatus
+
+from apps.rooms.models import Amenity, Room, RoomStatus, RoomType
+
 
 class RoomModelTest(TestCase):
     def setUp(self):
-        self.amenity_wifi = Amenity.objects.create(
-            name="Wi-Fi 6", code="WIFI6", icon="fa-wifi"
-        )
+        self.amenity_wifi = Amenity.objects.create(name="Wi-Fi 6", code="WIFI6", icon="fa-wifi")
         self.deluxe_type = RoomType.objects.create(
-            name="Deluxe Suite",
-            code="DLX",
-            base_price_per_night=Decimal("120.00"),
-            max_occupancy=2
+            name="Deluxe Suite", code="DLX", base_price_per_night=Decimal("120.00"), max_occupancy=2
         )
         self.room = Room.objects.create(
-            room_number="101",
-            floor=1,
-            room_type=self.deluxe_type,
-            status=RoomStatus.AVAILABLE
+            room_number="101", floor=1, room_type=self.deluxe_type, status=RoomStatus.AVAILABLE
         )
 
     def test_effective_price_defaults_to_room_type(self):

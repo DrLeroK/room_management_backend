@@ -1,13 +1,19 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from .views import RoomViewSet, RoomTypeViewSet, AmenityViewSet, PublicRoomAvailabilityView
+
+from .views import (
+    AmenityViewSet,
+    PublicRoomAvailabilityView,
+    RoomTypeViewSet,
+    RoomViewSet,
+)
 
 router = DefaultRouter()
-router.register(r'types', RoomTypeViewSet, basename='room-type')
-router.register(r'amenities', AmenityViewSet, basename='amenity')
-router.register(r'', RoomViewSet, basename='room')
+router.register(r"types", RoomTypeViewSet, basename="room-type")
+router.register(r"amenities", AmenityViewSet, basename="amenity")
+router.register(r"", RoomViewSet, basename="room")
 
 urlpatterns = [
-    path('public-availability/', PublicRoomAvailabilityView.as_view(), name='public-room-availability'),
-    path('', include(router.urls)),
+    path("public-availability/", PublicRoomAvailabilityView.as_view(), name="public-room-availability"),
+    path("", include(router.urls)),
 ]

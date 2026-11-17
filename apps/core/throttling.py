@@ -1,14 +1,16 @@
-from rest_framework.throttling import SimpleRateThrottle, AnonRateThrottle
 from django.core.cache import cache
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
+
 
 class LoginRateThrottle(SimpleRateThrottle):
     """
     Limits total login attempts per client IP address (10 per minute).
     """
-    scope = 'login'
+
+    scope = "login"
 
     def get_cache_key(self, request, view):
-        if request.user and request.user.is_authenticated:
+        if getattr(request, "user", None) and request.user.is_authenticated:
             return None
         ident = self.get_ident(request)
         return f"throttle_login_{ident}"
@@ -20,14 +22,20 @@ class BruteForceLockoutThrottle(SimpleRateThrottle):
     Tracks failed login attempts per (IP + Username).
     Locks out account for 15 minutes after 5 consecutive failed attempts.
     """
-    scope = 'brute_force'
+
+    scope = "brute_force"
     MAX_FAILED_ATTEMPTS = 5
     LOCKOUT_DURATION_SECONDS = 900  # 15 minutes
 
     def get_cache_key(self, request, view):
         ident = self.get_ident(request)
-        username = request.data.get('username', '').strip().lower() if hasattr(request, 'data') else ''
-        return f"brute_force_attempts_{ident}_{username}"
+        username = ""
+        if hasattr(request, "data") and isinstance(request.data, dict):
+            username = request.data.get("username", "")
+        elif hasattr(request, "POST"):
+            username = request.POST.get("username", "")
+        username_clean = (username or "").strip().lower()
+        return f"brute_force_attempts_{ident}_{username_clean}"
 
     def allow_request(self, request, view):
         self.key = self.get_cache_key(request, view)
@@ -49,7 +57,7 @@ class BruteForceLockoutThrottle(SimpleRateThrottle):
         Increments failed login counter in DB cache and sets 15-min TTL.
         """
         ident = cls().get_ident(request)
-        username_clean = (username or '').strip().lower()
+        username_clean = (username or "").strip().lower()
         key = f"brute_force_attempts_{ident}_{username_clean}"
 
         current_count = cache.get(key, 0) + 1
@@ -62,7 +70,7 @@ class BruteForceLockoutThrottle(SimpleRateThrottle):
         Resets failed login counter upon successful authentication.
         """
         ident = cls().get_ident(request)
-        username_clean = (username or '').strip().lower()
+        username_clean = (username or "").strip().lower()
         key = f"brute_force_attempts_{ident}_{username_clean}"
         cache.delete(key)
 
@@ -71,4 +79,5 @@ class SensitiveActionRateThrottle(AnonRateThrottle):
     """
     Limits sensitive actions like public booking submissions and contact form inquiries.
     """
-    scope = 'sensitive_action'
+
+    scope = "sensitive_action"

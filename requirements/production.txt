@@ -1,0 +1,5 @@
+-r base.txt
+
+# Production Server & Static Files
+gunicorn>=22.0.0
+whitenoise[brotli]>=6.6.0

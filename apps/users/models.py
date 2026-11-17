@@ -1,11 +1,12 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+
 class UserRole(models.TextChoices):
-    ADMIN = 'ADMIN', 'System Administrator'
-    OWNER = 'OWNER', 'Hotel Owner'
-    MANAGER = 'MANAGER', 'Hotel Manager'
-    RECEPTIONIST = 'RECEPTIONIST', 'Receptionist'
+    ADMIN = "ADMIN", "System Administrator"
+    OWNER = "OWNER", "Hotel Owner"
+    MANAGER = "MANAGER", "Hotel Manager"
+    RECEPTIONIST = "RECEPTIONIST", "Receptionist"
 
 
 class User(AbstractUser):
@@ -14,16 +15,16 @@ class User(AbstractUser):
         choices=UserRole.choices,
         default=UserRole.RECEPTIONIST,
         db_index=True,
-        help_text="Role determining user permissions across the system"
+        help_text="Role determining user permissions across the system",
     )
-    phone_number = models.CharField(max_length=30, blank=True, default='')
-    employee_id = models.CharField(max_length=30, blank=True, default='')
-    notes = models.TextField(blank=True, default='')
+    phone_number = models.CharField(max_length=30, blank=True, default="")
+    employee_id = models.CharField(max_length=30, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
 
     class Meta:
-        ordering = ['role', 'username']
-        verbose_name = 'User'
-        verbose_name_plural = 'Users'
+        ordering = ["role", "username"]
+        verbose_name = "User"
+        verbose_name_plural = "Users"
 
     def __str__(self):
         full_name = self.get_full_name()
@@ -44,4 +45,6 @@ class User(AbstractUser):
 
     @property
     def is_receptionist_role(self):
-        return self.role in [UserRole.RECEPTIONIST, UserRole.MANAGER, UserRole.OWNER, UserRole.ADMIN] or self.is_superuser
+        return (
+            self.role in [UserRole.RECEPTIONIST, UserRole.MANAGER, UserRole.OWNER, UserRole.ADMIN] or self.is_superuser
+        )

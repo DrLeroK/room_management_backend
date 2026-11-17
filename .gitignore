@@ -180,3 +180,9 @@ temp/
 room_management_backend/__pycache__/
 apps/__pycache__/
 config/__pycache__/
+# Ruff linter cache
+.ruff_cache/
+
+# Local static & media
+staticfiles/
+media/

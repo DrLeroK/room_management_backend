@@ -1,0 +1,79 @@
+# ==============================================================================
+# Docker Compose for StayCraft Hotel & Room Management Backend
+# ==============================================================================
+
+services:
+  # ============================================================================
+  # StayCraft Django Backend (Gunicorn + DRF REST API)
+  # ============================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: room_management_backend_app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-room_management_db}
+      - PORT=${PORT:-8000}
+      - DJANGO_ENV=development
+      - RUNNING_IN_DOCKER=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    networks:
+      - room_management_network
+
+  # ============================================================================
+  # PostgreSQL Database Service
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: room_management_backend_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-room_management_db}
+    ports:
+      - "${DOCKER_POSTGRES_PORT:-5435}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-room_management_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - room_management_network
+
+  # ============================================================================
+  # Mailpit - Email & SMTP Testing Server (Zero Auth in Dev)
+  # Web UI: http://localhost:8025 | SMTP Port: localhost:1025
+  # ============================================================================
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: room_management_backend_mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"  # Web UI (Access in browser to inspect all sent emails)
+      - "1025:1025"  # SMTP Port (Zero-auth SMTP delivery)
+    networks:
+      - room_management_network
+
+# ==============================================================================
+# Persistent Volumes & Network Definitions
+# ==============================================================================
+volumes:
+  postgres_data:
+    name: room_management_postgres_data
+
+networks:
+  room_management_network:
+    name: room_management_network
+    driver: bridge
