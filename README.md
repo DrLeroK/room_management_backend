@@ -21,7 +21,7 @@
 
 ## 📖 Overview
 
-**StayCraft Backend** is a production-hardened RESTful service built with Django and Django REST Framework. It powers all core domain operations of the StayCraft platform, including room inventory management, multi-role staff access control, online guest bookings with bank transfer screenshot proof, receptionist front desk workflows, automated SMS notifications, and financial reporting.
+**StayCraft Backend** is a production-hardened RESTful service built with Django and Django REST Framework. It powers all core domain operations of the StayCraft platform, including room inventory management, multi-role staff access control, online guest bookings with bank transfer screenshot proof, receptionist front desk workflows, and financial reporting.
 
 ---
 
