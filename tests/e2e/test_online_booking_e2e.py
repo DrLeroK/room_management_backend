@@ -11,11 +11,21 @@ from rest_framework import status
 
 from apps.bookings.models import BookingStatus
 from apps.payments.models import Payment, PaymentStatus
+from apps.rooms.models import Room, RoomStatus
 
 
 @pytest.mark.e2e
 class TestOnlineBookingLifecycleE2E:
     def test_full_online_booking_workflow(self, api_client, receptionist_client, sample_room):
+        # Create additional rooms so total_available > 2 (clearing last-room buffer)
+        for i in range(2, 5):
+            Room.objects.create(
+                room_number=f"10{i}",
+                floor=1,
+                room_type=sample_room.room_type,
+                status=RoomStatus.AVAILABLE,
+            )
+
         today = date.today() + timedelta(days=10)
         checkout = today + timedelta(days=3)
 

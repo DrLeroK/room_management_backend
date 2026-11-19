@@ -28,6 +28,13 @@ class Guest(TimeStampedModel):
     def __str__(self):
         return f"{self.full_name} ({self.phone_number})"
 
+    def save(self, *args, **kwargs):
+        if self.phone_number:
+            from apps.core.validators import normalize_ethiopian_phone
+
+            self.phone_number = normalize_ethiopian_phone(self.phone_number)
+        super().save(*args, **kwargs)
+
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()

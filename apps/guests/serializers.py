@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.core.validators import normalize_ethiopian_phone
+
 from .models import Guest
 
 
@@ -23,6 +25,12 @@ class GuestSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate_phone_number(self, value):
+        return normalize_ethiopian_phone(value)
+
 
 class GuestLookupSerializer(serializers.Serializer):
     phone_number = serializers.CharField(required=True)
+
+    def validate_phone_number(self, value):
+        return normalize_ethiopian_phone(value)

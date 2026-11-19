@@ -30,3 +30,31 @@ def validate_file_upload(file_obj, max_size_bytes=MAX_UPLOAD_SIZE_BYTES, allowed
     if ext not in allowed_extensions:
         allowed_str = ", ".join(allowed_extensions)
         raise ValidationError(f"Unsupported file format '{ext}'. Allowed formats: {allowed_str}")
+
+
+def normalize_ethiopian_phone(phone_str: str) -> str:
+    """
+    Normalizes Ethiopian phone numbers to international standard +251XXXXXXXXX.
+    Supports formats:
+      - 09XXXXXXXX or 07XXXXXXXX (10 digits) -> +2519XXXXXXXX or +2517XXXXXXXX
+      - 9XXXXXXXX or 7XXXXXXXX (9 digits) -> +2519XXXXXXXX or +2517XXXXXXXX
+      - 2519XXXXXXXX or 2517XXXXXXXX (12 digits) -> +2519XXXXXXXX or +2517XXXXXXXX
+      - +2519XXXXXXXX or +2517XXXXXXXX (13 digits) -> preserved as is
+    """
+    if not phone_str:
+        return ""
+
+    import re
+
+    cleaned = re.sub(r"[\s\-\(\)\.]", "", str(phone_str).strip())
+
+    if re.match(r"^0[97]\d{8}$", cleaned):
+        return f"+251{cleaned[1:]}"
+    if re.match(r"^[97]\d{8}$", cleaned):
+        return f"+251{cleaned}"
+    if re.match(r"^251[97]\d{8}$", cleaned):
+        return f"+{cleaned}"
+    if re.match(r"^\+251[97]\d{8}$", cleaned):
+        return cleaned
+
+    return cleaned

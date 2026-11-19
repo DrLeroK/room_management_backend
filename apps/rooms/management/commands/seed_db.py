@@ -1,3 +1,4 @@
+import os
 import random
 from datetime import timedelta
 
@@ -29,7 +30,30 @@ from apps.users.models import User, UserRole
 class Command(BaseCommand):
     help = "Seeds database with realistic hotel room types, rooms, guests, bookings, payments, landing page CMS content, testimonials, gallery, partners, and user accounts for all roles."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force seeding even if database already contains users or rooms (overrides Zero-Data-Loss guard).",
+        )
+
     def handle(self, *args, **options):
+        force_seed = options.get("force", False) or os.environ.get("FORCE_SEED", "").lower() in ("true", "1")
+
+        # Zero-Data-Loss Guard: Only run seed once on initial deployment!
+        has_users = User.objects.filter(role__in=[UserRole.ADMIN, UserRole.OWNER, UserRole.MANAGER]).exists()
+        has_rooms = Room.objects.exists()
+
+        if (has_users or has_rooms) and not force_seed:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "ℹ️ [Zero-Data-Loss Guard] Database has already been initialized (Users or Rooms exist).\n"
+                    "🔒 Skipping database seed execution to preserve live production data on redeployment.\n"
+                    "   (To re-seed in development, pass --force or set FORCE_SEED=true)"
+                )
+            )
+            return
+
         self.stdout.write(self.style.WARNING("Seeding Bedroom Management database..."))
 
         # Seed Accounts for all 4 System Roles with Strong Passwords

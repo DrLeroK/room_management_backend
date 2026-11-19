@@ -117,12 +117,69 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
-# Static & Media Assets
+# Static Assets
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Media Assets & Cloudflare R2 Cloud Object Storage (S3-Compatible API)
+# Optional: If configured, images and proofs are uploaded to Cloudflare R2.
+# If omitted or empty, automatically falls back to local disk storage (/media/).
+R2_ACCOUNT_ID = env("R2_ACCOUNT_ID", default="")
+R2_ACCESS_KEY_ID = env("R2_ACCESS_KEY_ID", default="")
+R2_SECRET_ACCESS_KEY = env("R2_SECRET_ACCESS_KEY", default="")
+R2_BUCKET_NAME = env("R2_BUCKET_NAME", default="")
+R2_PUBLIC_DOMAIN = env("R2_PUBLIC_DOMAIN", default="").strip()
+
+USE_R2_STORAGE = bool(
+    R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME
+)
+
+if USE_R2_STORAGE:
+    if "storages" not in INSTALLED_APPS:
+        INSTALLED_APPS.append("storages")
+
+    _r2_endpoint = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+    _r2_domain = (
+        R2_PUBLIC_DOMAIN.replace("https://", "").replace("http://", "").rstrip("/")
+        if R2_PUBLIC_DOMAIN
+        else None
+    )
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "access_key": R2_ACCESS_KEY_ID,
+                "secret_key": R2_SECRET_ACCESS_KEY,
+                "bucket_name": R2_BUCKET_NAME,
+                "endpoint_url": _r2_endpoint,
+                "custom_domain": _r2_domain,
+                "file_overwrite": False,
+                "default_acl": None,
+                "signature_version": "s3v4",
+                "querystring_auth": False,
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    if _r2_domain:
+        MEDIA_URL = f"https://{_r2_domain}/"
+    else:
+        MEDIA_URL = f"https://{R2_BUCKET_NAME}.r2.dev/"
+    MEDIA_ROOT = BASE_DIR / "media"
+else:
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 # Database-Backed Caching System (Zero-Redis architecture)
 CACHES = {

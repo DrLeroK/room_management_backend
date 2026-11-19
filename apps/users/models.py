@@ -48,3 +48,9 @@ class User(AbstractUser):
         return (
             self.role in [UserRole.RECEPTIONIST, UserRole.MANAGER, UserRole.OWNER, UserRole.ADMIN] or self.is_superuser
         )
+
+    def save(self, *args, **kwargs):
+        if self.phone_number:
+            from apps.core.validators import normalize_ethiopian_phone
+            self.phone_number = normalize_ethiopian_phone(self.phone_number)
+        super().save(*args, **kwargs)

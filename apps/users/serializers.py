@@ -3,6 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from apps.core.validators import normalize_ethiopian_phone
 from .models import UserRole
 
 User = get_user_model()
@@ -55,6 +56,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "notes",
         ]
 
+    def validate_phone_number(self, value):
+        if value:
+            return normalize_ethiopian_phone(value)
+        return value
+
     def validate(self, data):
         if data["password"] != data["password_confirm"]:
             raise serializers.ValidationError({"password_confirm": "Password fields do not match."})
@@ -84,6 +90,11 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["first_name", "last_name", "email", "role", "phone_number", "employee_id", "notes", "is_active"]
+
+    def validate_phone_number(self, value):
+        if value:
+            return normalize_ethiopian_phone(value)
+        return value
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

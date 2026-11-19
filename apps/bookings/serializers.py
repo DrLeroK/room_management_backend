@@ -102,6 +102,11 @@ class GuestInputSerializer(serializers.Serializer):
     identification_number = serializers.CharField(required=False, allow_blank=True, default="")
     address = serializers.CharField(required=False, allow_blank=True, default="")
 
+    def validate_phone_number(self, value):
+        from apps.core.validators import normalize_ethiopian_phone
+
+        return normalize_ethiopian_phone(value)
+
 
 class OnlineBookingCreateSerializer(serializers.Serializer):
     guest = serializers.JSONField(
@@ -120,6 +125,11 @@ class OnlineBookingCreateSerializer(serializers.Serializer):
     adults_count = serializers.IntegerField(default=1, min_value=1)
     children_count = serializers.IntegerField(default=0, min_value=0)
     special_requests = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate_guest_phone_number(self, value):
+        from apps.core.validators import normalize_ethiopian_phone
+
+        return normalize_ethiopian_phone(value)
 
     def validate(self, data):
         if data["check_in_date"] >= data["check_out_date"]:
@@ -148,6 +158,9 @@ class OnlineBookingCreateSerializer(serializers.Serializer):
         if not guest_dict.get("first_name") or not guest_dict.get("phone_number"):
             raise serializers.ValidationError({"guest": "Guest first_name and phone_number are required."})
 
+        from apps.core.validators import normalize_ethiopian_phone
+
+        guest_dict["phone_number"] = normalize_ethiopian_phone(guest_dict["phone_number"])
         data["parsed_guest"] = guest_dict
         return data
 
