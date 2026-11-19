@@ -141,9 +141,7 @@ class PublicRoomAvailabilityView(APIView):
             is_online_search=True,
         )
 
-        sales_closed_by_last_room_rule = (
-            raw_available_rooms.exists() and not online_available_rooms.exists()
-        )
+        sales_closed_by_last_room_rule = raw_available_rooms.exists() and not online_available_rooms.exists()
 
         serializer = RoomSerializer(online_available_rooms, many=True)
         response_payload = {

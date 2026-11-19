@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -52,9 +51,7 @@ def check_room_availability(room_id, check_in_date, check_out_date, exclude_book
     return not overlapping_query.exists()
 
 
-def find_available_rooms(
-    check_in_date, check_out_date, guests_count=1, room_type_id=None, is_online_search=False
-):
+def find_available_rooms(check_in_date, check_out_date, guests_count=1, room_type_id=None, is_online_search=False):
     """
     Returns available rooms matching stay dates and capacity.
     Enforces The Last-Room Rule:
@@ -79,11 +76,7 @@ def find_available_rooms(
         queryset = queryset.filter(room_type_id=room_type_id)
 
     if is_online_search:
-        total_active_rooms = (
-            Room.objects.filter(is_active=True)
-            .exclude(status=RoomStatus.MAINTENANCE)
-            .count()
-        )
+        total_active_rooms = Room.objects.filter(is_active=True).exclude(status=RoomStatus.MAINTENANCE).count()
         total_available_overall = (
             Room.objects.filter(is_active=True)
             .exclude(status=RoomStatus.MAINTENANCE)
@@ -92,8 +85,7 @@ def find_available_rooms(
         )
 
         is_occupancy_98 = (
-            total_active_rooms > 0
-            and ((total_active_rooms - total_available_overall) / total_active_rooms) >= 0.98
+            total_active_rooms > 0 and ((total_active_rooms - total_available_overall) / total_active_rooms) >= 0.98
         )
         if total_available_overall <= 2 or is_occupancy_98:
             return Room.objects.none()
@@ -167,11 +159,7 @@ def create_online_booking(
             check_out_date__gt=check_in_date,
         ).values_list("room_id", flat=True)
 
-        total_active_rooms = (
-            Room.objects.filter(is_active=True)
-            .exclude(status=RoomStatus.MAINTENANCE)
-            .count()
-        )
+        total_active_rooms = Room.objects.filter(is_active=True).exclude(status=RoomStatus.MAINTENANCE).count()
         total_available = (
             Room.objects.filter(is_active=True)
             .exclude(status=RoomStatus.MAINTENANCE)
@@ -180,13 +168,14 @@ def create_online_booking(
         )
 
         is_occupancy_98 = (
-            total_active_rooms > 0
-            and ((total_active_rooms - total_available) / total_active_rooms) >= 0.98
+            total_active_rooms > 0 and ((total_active_rooms - total_available) / total_active_rooms) >= 0.98
         )
 
         if total_available <= 2 or is_occupancy_98:
             raise ValidationError(
-                {"detail": "Online bookings are closed for the last remaining rooms. Please contact our front desk directly to reserve."}
+                {
+                    "detail": "Online bookings are closed for the last remaining rooms. Please contact our front desk directly to reserve."
+                }
             )
 
         guest = get_or_create_guest(guest_data)

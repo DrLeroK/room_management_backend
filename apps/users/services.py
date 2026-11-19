@@ -96,9 +96,7 @@ def terminate_user_sessions_and_tokens(user):
             f"[SESSION TERMINATION] Blacklisted {revoked_count} outstanding tokens for user {user.username} (ID: {user.pk})."
         )
     except Exception as e:
-        logger.error(
-            f"[SESSION TERMINATION ERROR] Failed to blacklist tokens for user {user.username}: {e}"
-        )
+        logger.error(f"[SESSION TERMINATION ERROR] Failed to blacklist tokens for user {user.username}: {e}")
 
     # Flush Django sessions (if any active sessions exist in the session store)
     try:
@@ -119,8 +117,6 @@ def terminate_user_sessions_and_tokens(user):
                 f"[SESSION TERMINATION] Deleted {sessions_deleted} active Django sessions for user {user.username}."
             )
     except Exception as e:
-        logger.error(
-            f"[SESSION TERMINATION ERROR] Failed to clear Django sessions for user {user.username}: {e}"
-        )
+        logger.error(f"[SESSION TERMINATION ERROR] Failed to clear Django sessions for user {user.username}: {e}")
 
     return revoked_count

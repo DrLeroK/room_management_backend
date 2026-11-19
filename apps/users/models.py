@@ -50,7 +50,10 @@ class User(AbstractUser):
         )
 
     def save(self, *args, **kwargs):
+        if self.is_superuser and self.role != UserRole.ADMIN:
+            self.role = UserRole.ADMIN
         if self.phone_number:
             from apps.core.validators import normalize_ethiopian_phone
+
             self.phone_number = normalize_ethiopian_phone(self.phone_number)
         super().save(*args, **kwargs)

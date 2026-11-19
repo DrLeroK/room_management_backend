@@ -31,9 +31,7 @@ class TestLastRoomRuleUnit:
                 status=RoomStatus.AVAILABLE,
             )
 
-        online_rooms = find_available_rooms(
-            self.check_in, self.check_out, guests_count=1, is_online_search=True
-        )
+        online_rooms = find_available_rooms(self.check_in, self.check_out, guests_count=1, is_online_search=True)
         assert online_rooms.count() == 5
 
     def test_last_room_rule_hides_last_two_rooms_from_online_search(self):
@@ -52,15 +50,11 @@ class TestLastRoomRuleUnit:
         )
 
         # Online search must return 0 rooms (Last-Room Rule triggered)
-        online_rooms = find_available_rooms(
-            self.check_in, self.check_out, guests_count=1, is_online_search=True
-        )
+        online_rooms = find_available_rooms(self.check_in, self.check_out, guests_count=1, is_online_search=True)
         assert online_rooms.count() == 0
 
         # Front desk staff search (is_online_search=False) must STILL see both rooms
-        staff_rooms = find_available_rooms(
-            self.check_in, self.check_out, guests_count=1, is_online_search=False
-        )
+        staff_rooms = find_available_rooms(self.check_in, self.check_out, guests_count=1, is_online_search=False)
         assert staff_rooms.count() == 2
         assert set(staff_rooms.values_list("id", flat=True)) == {r1.id, r2.id}
 

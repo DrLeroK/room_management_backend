@@ -4,6 +4,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.core.validators import normalize_ethiopian_phone
+
 from .models import UserRole
 
 User = get_user_model()
@@ -155,4 +156,3 @@ class LogoutSerializer(serializers.Serializer):
         required=True,
         help_text="The refresh token to be invalidated and blacklisted on the server.",
     )
-

@@ -130,9 +130,7 @@ R2_SECRET_ACCESS_KEY = env("R2_SECRET_ACCESS_KEY", default="")
 R2_BUCKET_NAME = env("R2_BUCKET_NAME", default="")
 R2_PUBLIC_DOMAIN = env("R2_PUBLIC_DOMAIN", default="").strip()
 
-USE_R2_STORAGE = bool(
-    R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME
-)
+USE_R2_STORAGE = bool(R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_BUCKET_NAME)
 
 if USE_R2_STORAGE:
     if "storages" not in INSTALLED_APPS:
@@ -140,9 +138,7 @@ if USE_R2_STORAGE:
 
     _r2_endpoint = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
     _r2_domain = (
-        R2_PUBLIC_DOMAIN.replace("https://", "").replace("http://", "").rstrip("/")
-        if R2_PUBLIC_DOMAIN
-        else None
+        R2_PUBLIC_DOMAIN.replace("https://", "").replace("http://", "").rstrip("/") if R2_PUBLIC_DOMAIN else None
     )
 
     STORAGES = {
