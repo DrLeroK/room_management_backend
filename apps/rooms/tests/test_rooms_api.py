@@ -41,6 +41,13 @@ class RoomAPITest(APITestCase):
         self.assertEqual(self.room.status, RoomStatus.MAINTENANCE)
 
     def test_public_room_availability_api(self):
+        # Create extra single rooms so total hotel rooms > 2 (clearing last-room buffer threshold)
+        single_type = RoomType.objects.create(
+            name="Single Room", code="SGL", base_price_per_night=Decimal("80.00"), max_occupancy=1
+        )
+        Room.objects.create(room_number="101", floor=1, room_type=single_type, status=RoomStatus.AVAILABLE)
+        Room.objects.create(room_number="102", floor=1, room_type=single_type, status=RoomStatus.AVAILABLE)
+
         # Unauthenticated guest request
         self.client.logout()
         url = reverse("public-room-availability")

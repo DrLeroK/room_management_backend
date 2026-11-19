@@ -23,6 +23,8 @@ class BookingAPITest(APITestCase):
         self.room = Room.objects.create(
             room_number="301", floor=3, room_type=self.room_type, status=RoomStatus.AVAILABLE
         )
+        for i in range(2, 5):
+            Room.objects.create(room_number=f"30{i}", floor=3, room_type=self.room_type, status=RoomStatus.AVAILABLE)
         self.today = date.today()
 
     def test_hotel_bank_details_api(self):

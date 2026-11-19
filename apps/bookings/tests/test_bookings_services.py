@@ -23,6 +23,8 @@ class BookingServicesTest(TestCase):
         self.room = Room.objects.create(
             room_number="105", floor=1, room_type=self.room_type, status=RoomStatus.AVAILABLE
         )
+        for i in range(6, 9):
+            Room.objects.create(room_number=f"10{i}", floor=1, room_type=self.room_type, status=RoomStatus.AVAILABLE)
         self.guest_data = {
             "first_name": "John",
             "last_name": "Doe",
