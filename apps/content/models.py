@@ -32,22 +32,22 @@ class HotelBankDetails(TimeStampedModel):
     bank_name = models.CharField(max_length=200, default="Commercial Bank of Ethiopia (CBE)")
     account_name = models.CharField(max_length=200, default="StayCraft Hotel & Bedroom Resort")
     account_number = models.CharField(max_length=50, default="1000123456789")
+    branch_name = models.CharField(max_length=150, blank=True, default="")
     swift_code = models.CharField(max_length=50, default="CBETETAA", blank=True)
+    qr_code = models.ImageField(upload_to="hotel_content/bank_qrs/", null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
     instructions = models.TextField(
         blank=True,
         default="Transfer total stay amount to the account above and upload the receipt/screenshot during online booking.",
     )
 
     class Meta:
+        ordering = ["display_order", "bank_name"]
         verbose_name_plural = "Hotel Bank Details"
 
     def __str__(self):
-        return f"Bank Details: {self.bank_name}"
-
-    def save(self, *args, **kwargs):
-        # Ensure singleton instance
-        self.pk = 1
-        super().save(*args, **kwargs)
+        return f"{self.bank_name} - {self.account_number} ({self.account_name})"
 
 
 class Testimonial(TimeStampedModel):

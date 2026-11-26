@@ -125,6 +125,7 @@ class OnlineBookingCreateSerializer(serializers.Serializer):
     adults_count = serializers.IntegerField(default=1, min_value=1)
     children_count = serializers.IntegerField(default=0, min_value=0)
     special_requests = serializers.CharField(required=False, allow_blank=True, default="")
+    session_id = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate_guest_phone_number(self, value):
         from apps.core.validators import normalize_ethiopian_phone

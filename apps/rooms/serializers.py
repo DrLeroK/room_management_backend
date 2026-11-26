@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
-from .models import Amenity, Room, RoomType
+from apps.content.serializers import resolve_media_url
+
+from .models import Amenity, Room, RoomHold, RoomType
 
 
 class AmenitySerializer(serializers.ModelSerializer):
@@ -11,6 +13,7 @@ class AmenitySerializer(serializers.ModelSerializer):
 
 class RoomTypeSerializer(serializers.ModelSerializer):
     active_rooms_count = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = RoomType
@@ -21,6 +24,8 @@ class RoomTypeSerializer(serializers.ModelSerializer):
             "description",
             "base_price_per_night",
             "max_occupancy",
+            "image",
+            "image_url",
             "is_active",
             "active_rooms_count",
             "created_at",
@@ -29,6 +34,10 @@ class RoomTypeSerializer(serializers.ModelSerializer):
 
     def get_active_rooms_count(self, obj):
         return obj.rooms.filter(is_active=True).count()
+
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        return resolve_media_url(obj.image, request)
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -79,3 +88,35 @@ class RoomAvailabilitySearchSerializer(serializers.Serializer):
                     {"check_out_date": "Check-out date must be strictly after check-in date."}
                 )
         return data
+
+
+class RoomHoldSerializer(serializers.ModelSerializer):
+    room_number = serializers.CharField(source="room.room_number", read_only=True)
+    room_type_name = serializers.CharField(source="room.room_type.name", read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = RoomHold
+        fields = [
+            "id",
+            "room",
+            "room_number",
+            "room_type_name",
+            "check_in_date",
+            "check_out_date",
+            "session_id",
+            "expires_at",
+            "is_expired",
+            "created_at",
+        ]
+        read_only_fields = ["id", "expires_at", "is_expired", "created_at"]
+
+    def validate(self, data):
+        check_in = data.get("check_in_date")
+        check_out = data.get("check_out_date")
+        if check_in and check_out and check_in >= check_out:
+            raise serializers.ValidationError(
+                {"check_out_date": "Check-out date must be strictly after check-in date."}
+            )
+        return data
+

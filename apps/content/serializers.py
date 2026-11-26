@@ -12,6 +12,19 @@ from .models import (
 )
 
 
+def resolve_media_url(file_field, request=None):
+    if not file_field:
+        return None
+    url = str(file_field.url).strip()
+    if url.startswith("//"):
+        return f"https:{url}"
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    if request:
+        return request.build_absolute_uri(url)
+    return url
+
+
 class HotelProfileSerializer(serializers.ModelSerializer):
     hero_image_url = serializers.SerializerMethodField()
 
@@ -35,15 +48,12 @@ class HotelProfileSerializer(serializers.ModelSerializer):
         ]
 
     def get_hero_image_url(self, obj):
-        if obj.hero_image:
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(obj.hero_image.url)
-            return obj.hero_image.url
-        return None
+        return resolve_media_url(obj.hero_image, self.context.get("request"))
 
 
 class HotelBankDetailsSerializer(serializers.ModelSerializer):
+    qr_code_url = serializers.SerializerMethodField()
+
     class Meta:
         model = HotelBankDetails
         fields = [
@@ -51,12 +61,20 @@ class HotelBankDetailsSerializer(serializers.ModelSerializer):
             "bank_name",
             "account_name",
             "account_number",
+            "branch_name",
             "swift_code",
+            "qr_code",
+            "qr_code_url",
+            "is_active",
+            "display_order",
             "instructions",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_qr_code_url(self, obj):
+        return resolve_media_url(obj.qr_code, self.context.get("request"))
 
 
 class TestimonialSerializer(serializers.ModelSerializer):
@@ -79,12 +97,7 @@ class TestimonialSerializer(serializers.ModelSerializer):
         ]
 
     def get_avatar_url(self, obj):
-        if obj.avatar:
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(obj.avatar.url)
-            return obj.avatar.url
-        return None
+        return resolve_media_url(obj.avatar, self.context.get("request"))
 
 
 class GalleryCategorySerializer(serializers.ModelSerializer):
@@ -114,12 +127,7 @@ class GalleryItemSerializer(serializers.ModelSerializer):
         ]
 
     def get_image_url(self, obj):
-        if obj.image:
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
-        return None
+        return resolve_media_url(obj.image, self.context.get("request"))
 
 
 class PartnerSerializer(serializers.ModelSerializer):
@@ -140,12 +148,7 @@ class PartnerSerializer(serializers.ModelSerializer):
         ]
 
     def get_logo_url(self, obj):
-        if obj.logo:
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(obj.logo.url)
-            return obj.logo.url
-        return None
+        return resolve_media_url(obj.logo, self.context.get("request"))
 
 
 class FAQSerializer(serializers.ModelSerializer):

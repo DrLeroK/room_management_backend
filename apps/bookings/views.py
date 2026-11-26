@@ -1,6 +1,7 @@
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import filters, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -75,6 +76,29 @@ class BookingViewSet(viewsets.ModelViewSet):
             qs = qs.filter(room__room_number=room_number)
         return qs
 
+    @action(detail=False, methods=["get"], url_path="pending-verification")
+    def pending_verification(self, request):
+        """
+        Lightweight endpoint for navbar notification bell: returns count and recent bookings
+        pending payment verification.
+        """
+        pending_qs = (
+            Booking.objects.filter(status=BookingStatus.PENDING_PAYMENT_VERIFICATION)
+            .select_related("guest", "room", "room__room_type")
+            .prefetch_related("payments")
+            .order_by("-created_at")
+        )
+        total_count = pending_qs.count()
+        recent_bookings = pending_qs[:10]
+        serializer = BookingSerializer(recent_bookings, many=True, context={"request": request})
+        return Response(
+            {
+                "count": total_count,
+                "results": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class OnlineBookingView(APIView):
     """
@@ -110,6 +134,7 @@ class OnlineBookingView(APIView):
             adults_count=data.get("adults_count", 1),
             children_count=data.get("children_count", 0),
             special_requests=data.get("special_requests", ""),
+            session_id=data.get("session_id"),
         )
 
         context_serializer = BookingSerializer(booking, context={"request": request})

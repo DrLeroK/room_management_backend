@@ -64,3 +64,45 @@ class RoomAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["available_count"], 1)
         self.assertEqual(response.data["rooms"][0]["room_number"], "201")
+
+    def test_unauthenticated_guest_can_list_rooms_and_types(self):
+        self.client.logout()
+        res_rooms = self.client.get(reverse("room-list"))
+        self.assertEqual(res_rooms.status_code, status.HTTP_200_OK)
+
+        res_types = self.client.get(reverse("room-type-list"))
+        self.assertEqual(res_types.status_code, status.HTTP_200_OK)
+
+    def test_room_hold_lifecycle(self):
+        self.client.logout()
+        url = reverse("room-hold-list")
+        check_in = (date.today() + timedelta(days=10)).strftime("%Y-%m-%d")
+        check_out = (date.today() + timedelta(days=12)).strftime("%Y-%m-%d")
+
+        # Create hold
+        payload = {
+            "room": self.room.id,
+            "check_in_date": check_in,
+            "check_out_date": check_out,
+            "session_id": "session-test-123",
+        }
+        res = self.client.post(url, payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["session_id"], "session-test-123")
+
+        # Second hold from different session on same room/dates should fail
+        payload2 = {
+            "room": self.room.id,
+            "check_in_date": check_in,
+            "check_out_date": check_out,
+            "session_id": "session-test-456",
+        }
+        res2 = self.client.post(url, payload2, format="json")
+        self.assertEqual(res2.status_code, status.HTTP_409_CONFLICT)
+
+        # Release hold
+        release_url = reverse("room-hold-release-hold")
+        res_release = self.client.post(release_url, {"session_id": "session-test-123"}, format="json")
+        self.assertEqual(res_release.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_release.data["released"])
+

@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -5,13 +8,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.bookings.services import find_available_rooms
+from apps.bookings.services import check_room_availability, find_available_rooms
 from apps.users.permissions import IsManagerRole, IsReceptionistRole
 
-from .models import Amenity, Room, RoomType
+from .models import Amenity, Room, RoomHold, RoomType
 from .serializers import (
     AmenitySerializer,
     RoomAvailabilitySearchSerializer,
+    RoomHoldSerializer,
     RoomSerializer,
     RoomStatusUpdateSerializer,
     RoomTypeSerializer,
@@ -30,13 +34,14 @@ class AmenityViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [IsAuthenticated(), IsReceptionistRole()]
+            return [AllowAny()]
         return [IsAuthenticated(), IsManagerRole()]
 
 
 class RoomTypeViewSet(viewsets.ModelViewSet):
     """
     Staff / Owner viewset for managing Room Types and pricing rules.
+    Public can view types and pricing; write access restricted to managers.
     """
 
     queryset = RoomType.objects.all()
@@ -47,7 +52,7 @@ class RoomTypeViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [IsAuthenticated(), IsReceptionistRole()]
+            return [AllowAny()]
         return [IsAuthenticated(), IsManagerRole()]
 
 
@@ -78,6 +83,8 @@ class RoomViewSet(viewsets.ModelViewSet):
         return qs
 
     def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
         # Only managers/owners can delete rooms or create new rooms
         if self.action in ["create", "destroy"]:
             return [IsAuthenticated(), IsManagerRole()]
@@ -163,3 +170,56 @@ class PublicRoomAvailabilityView(APIView):
             )
 
         return Response(response_payload, status=status.HTTP_200_OK)
+
+
+class RoomHoldViewSet(viewsets.GenericViewSet):
+    """
+    Public endpoint to place and release 10-minute temporary holds on rooms
+    during guest checkout, preventing double-booking while guest completes payment.
+    """
+
+    permission_classes = [AllowAny]
+    queryset = RoomHold.objects.all()
+    serializer_class = RoomHoldSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        room = serializer.validated_data["room"]
+        check_in_date = serializer.validated_data["check_in_date"]
+        check_out_date = serializer.validated_data["check_out_date"]
+        session_id = serializer.validated_data["session_id"]
+
+        # Check real-time availability ignoring any existing hold for this same session
+        if not check_room_availability(room.id, check_in_date, check_out_date, exclude_session_id=session_id):
+            return Response(
+                {"error": f"Room {room.room_number} is no longer available for the selected dates."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # Clear existing holds by this session
+        RoomHold.objects.filter(session_id=session_id).delete()
+
+        # Hold for 10 minutes
+        hold = RoomHold.objects.create(
+            room=room,
+            check_in_date=check_in_date,
+            check_out_date=check_out_date,
+            session_id=session_id,
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+
+        return Response(RoomHoldSerializer(hold).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["post"], url_path="release")
+    def release_hold(self, request):
+        session_id = request.data.get("session_id")
+        hold_id = request.data.get("hold_id")
+        if session_id:
+            count, _ = RoomHold.objects.filter(session_id=session_id).delete()
+            return Response({"released": True, "count": count}, status=status.HTTP_200_OK)
+        if hold_id:
+            count, _ = RoomHold.objects.filter(id=hold_id).delete()
+            return Response({"released": True, "count": count}, status=status.HTTP_200_OK)
+        return Response({"error": "session_id or hold_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+

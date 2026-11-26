@@ -31,6 +31,7 @@ class RoomType(TimeStampedModel):
     description = models.TextField(blank=True, default="")
     base_price_per_night = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     max_occupancy = models.PositiveIntegerField(default=2)
+    image = models.ImageField(upload_to="room_types/", null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -67,3 +68,31 @@ class Room(TimeStampedModel):
         if self.price_per_night_override is not None:
             return self.price_per_night_override
         return self.room_type.base_price_per_night
+
+
+class RoomHold(TimeStampedModel):
+    """
+    Temporary 10-minute hold placed on a room when an online guest proceeds to checkout/payment.
+    Automatically ignored in availability searches once expires_at is in the past.
+    """
+
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="holds")
+    check_in_date = models.DateField()
+    check_out_date = models.DateField()
+    session_id = models.CharField(max_length=100, db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["room", "check_in_date", "check_out_date", "expires_at"]),
+        ]
+
+    def __str__(self):
+        return f"Hold on Room {self.room.room_number} until {self.expires_at} (session: {self.session_id})"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() >= self.expires_at
+

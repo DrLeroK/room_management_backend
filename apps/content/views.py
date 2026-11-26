@@ -47,8 +47,13 @@ class LandingPageView(APIView):
         room_types = RoomType.objects.filter(is_active=True)
         amenities = Amenity.objects.all()
 
-        bank_details, _ = HotelBankDetails.objects.get_or_create(id=1)
-        bank_data = HotelBankDetailsSerializer(bank_details).data
+        active_bank_accounts = HotelBankDetails.objects.filter(is_active=True)
+        primary_bank = active_bank_accounts.first()
+        if not primary_bank:
+            primary_bank, _ = HotelBankDetails.objects.get_or_create(id=1)
+        bank_data = HotelBankDetailsSerializer(primary_bank, context={"request": request}).data
+        all_banks_data = HotelBankDetailsSerializer(active_bank_accounts, many=True, context={"request": request}).data
+        bank_data["accounts"] = all_banks_data
 
         return Response(
             {
@@ -60,6 +65,7 @@ class LandingPageView(APIView):
                 "partners": PartnerSerializer(partners, many=True, context={"request": request}).data,
                 "faqs": FAQSerializer(faqs, many=True, context={"request": request}).data,
                 "bank_transfer_details": bank_data,
+                "bank_accounts": all_banks_data,
             },
             status=status.HTTP_200_OK,
         )
@@ -87,6 +93,30 @@ class HotelProfileView(APIView):
         return Response(serializer.data)
 
 
+class HotelBankDetailsViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage multiple hotel bank accounts (CBE, Telebirr, Awash, etc.).
+    Public can view active accounts; Owner/Admin can create, edit, or delete accounts.
+    """
+
+    queryset = HotelBankDetails.objects.all()
+    serializer_class = HotelBankDetailsSerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ["display_order", "bank_name"]
+
+    def get_queryset(self):
+        queryset = HotelBankDetails.objects.all()
+        # If unauthenticated or guest, only active accounts
+        if not (self.request.user and self.request.user.is_authenticated and self.request.user.role in ["ADMIN", "OWNER", "MANAGER", "RECEPTIONIST"]):
+            queryset = queryset.filter(is_active=True)
+        return queryset
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        return [IsAuthenticated(), IsOwnerRole()]
+
+
 class HotelBankDetailsView(APIView):
     """
     View to inspect or update hotel bank details. Public GET for transfer info; PUT requires Owner/Admin.
@@ -98,13 +128,18 @@ class HotelBankDetailsView(APIView):
         return [IsAuthenticated(), IsOwnerRole()]
 
     def get(self, request):
-        bank_details, created = HotelBankDetails.objects.get_or_create(id=1)
-        serializer = HotelBankDetailsSerializer(bank_details)
-        return Response(serializer.data)
+        accounts = HotelBankDetails.objects.filter(is_active=True)
+        primary = accounts.first()
+        if not primary:
+            primary, _ = HotelBankDetails.objects.get_or_create(id=1)
+        serializer = HotelBankDetailsSerializer(primary, context={"request": request})
+        data = serializer.data
+        data["accounts"] = HotelBankDetailsSerializer(accounts, many=True, context={"request": request}).data
+        return Response(data)
 
     def put(self, request):
         bank_details, created = HotelBankDetails.objects.get_or_create(id=1)
-        serializer = HotelBankDetailsSerializer(bank_details, data=request.data, partial=True)
+        serializer = HotelBankDetailsSerializer(bank_details, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -118,9 +153,14 @@ class PublicBankDetailsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        bank_details, created = HotelBankDetails.objects.get_or_create(id=1)
-        serializer = HotelBankDetailsSerializer(bank_details)
-        return Response(serializer.data)
+        accounts = HotelBankDetails.objects.filter(is_active=True)
+        primary = accounts.first()
+        if not primary:
+            primary, _ = HotelBankDetails.objects.get_or_create(id=1)
+        serializer = HotelBankDetailsSerializer(primary, context={"request": request})
+        data = serializer.data
+        data["accounts"] = HotelBankDetailsSerializer(accounts, many=True, context={"request": request}).data
+        return Response(data)
 
 
 class TestimonialViewSet(viewsets.ModelViewSet):
@@ -146,11 +186,20 @@ class GalleryCategoryViewSet(viewsets.ModelViewSet):
 
 
 class GalleryItemViewSet(viewsets.ModelViewSet):
-    queryset = GalleryItem.objects.filter(is_active=True).select_related("category")
     serializer_class = GalleryItemSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["title", "caption", "category__name"]
     ordering_fields = ["display_order", "created_at"]
+
+    def get_queryset(self):
+        queryset = GalleryItem.objects.filter(is_active=True).select_related("category")
+        category_param = self.request.query_params.get("category")
+        if category_param and category_param.lower() != "all":
+            if category_param.isdigit():
+                queryset = queryset.filter(category_id=int(category_param))
+            else:
+                queryset = queryset.filter(category__name__iexact=category_param) | queryset.filter(category__slug__iexact=category_param)
+        return queryset
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:

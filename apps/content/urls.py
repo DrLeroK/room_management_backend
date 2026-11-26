@@ -9,6 +9,7 @@ from .views import (
     GalleryCategoryViewSet,
     GalleryItemViewSet,
     HotelBankDetailsView,
+    HotelBankDetailsViewSet,
     HotelProfileView,
     LandingPageView,
     PartnerViewSet,
@@ -22,6 +23,7 @@ router.register(r"gallery-categories", GalleryCategoryViewSet, basename="gallery
 router.register(r"gallery", GalleryItemViewSet, basename="gallery")
 router.register(r"partners", PartnerViewSet, basename="partner")
 router.register(r"faqs", FAQViewSet, basename="faq")
+router.register(r"bank-accounts", HotelBankDetailsViewSet, basename="bank-account")
 
 urlpatterns = [
     path("landing-page/", LandingPageView.as_view(), name="landing-page"),

@@ -22,13 +22,14 @@ from apps.core.notifications import (
 )
 from apps.guests.models import Guest
 from apps.payments.models import Payment, PaymentStatus, PaymentType
-from apps.rooms.models import Room, RoomStatus
+from apps.rooms.models import Room, RoomHold, RoomStatus
 
 
-def check_room_availability(room_id, check_in_date, check_out_date, exclude_booking_id=None):
+def check_room_availability(room_id, check_in_date, check_out_date, exclude_booking_id=None, exclude_session_id=None):
     """
     Checks if a room is available for requested stay window.
-    Occupied or reserved statuses include CONFIRMED, CHECKED_IN, and PENDING_PAYMENT_VERIFICATION.
+    Occupied or reserved statuses include CONFIRMED, CHECKED_IN, and PENDING_PAYMENT_VERIFICATION,
+    as well as active unexpired 10-minute holds.
     """
     try:
         room = Room.objects.get(id=room_id, is_active=True)
@@ -48,26 +49,54 @@ def check_room_availability(room_id, check_in_date, check_out_date, exclude_book
     if exclude_booking_id:
         overlapping_query = overlapping_query.exclude(id=exclude_booking_id)
 
-    return not overlapping_query.exists()
+    if overlapping_query.exists():
+        return False
+
+    # Check for active temporary holds (10-minute checkout locks)
+    active_holds = RoomHold.objects.filter(
+        room_id=room_id,
+        expires_at__gt=timezone.now(),
+        check_in_date__lt=check_out_date,
+        check_out_date__gt=check_in_date,
+    )
+    if exclude_session_id:
+        active_holds = active_holds.exclude(session_id=exclude_session_id)
+
+    return not active_holds.exists()
 
 
-def find_available_rooms(check_in_date, check_out_date, guests_count=1, room_type_id=None, is_online_search=False):
+def find_available_rooms(
+    check_in_date, check_out_date, guests_count=1, room_type_id=None, is_online_search=False, session_id=None
+):
     """
     Returns available rooms matching stay dates and capacity.
     Enforces The Last-Room Rule:
     If is_online_search=True, closes online sales when total available rooms <= 2
     or when overall hotel occupancy reaches 98%, reserving the final rooms strictly for Front Desk walk-ins.
     """
-    unavailable_room_ids = Booking.objects.filter(
-        status__in=[BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN, BookingStatus.PENDING_PAYMENT_VERIFICATION],
+    unavailable_room_ids = list(
+        Booking.objects.filter(
+            status__in=[BookingStatus.CONFIRMED, BookingStatus.CHECKED_IN, BookingStatus.PENDING_PAYMENT_VERIFICATION],
+            check_in_date__lt=check_out_date,
+            check_out_date__gt=check_in_date,
+        ).values_list("room_id", flat=True)
+    )
+
+    held_query = RoomHold.objects.filter(
+        expires_at__gt=timezone.now(),
         check_in_date__lt=check_out_date,
         check_out_date__gt=check_in_date,
-    ).values_list("room_id", flat=True)
+    )
+    if session_id:
+        held_query = held_query.exclude(session_id=session_id)
+    held_room_ids = list(held_query.values_list("room_id", flat=True))
+
+    all_blocked_ids = set(unavailable_room_ids + held_room_ids)
 
     queryset = (
         Room.objects.filter(is_active=True, room_type__max_occupancy__gte=guests_count)
         .exclude(status=RoomStatus.MAINTENANCE)
-        .exclude(id__in=unavailable_room_ids)
+        .exclude(id__in=all_blocked_ids)
         .select_related("room_type")
         .prefetch_related("amenities")
     )
@@ -80,7 +109,7 @@ def find_available_rooms(check_in_date, check_out_date, guests_count=1, room_typ
         total_available_overall = (
             Room.objects.filter(is_active=True)
             .exclude(status=RoomStatus.MAINTENANCE)
-            .exclude(id__in=unavailable_room_ids)
+            .exclude(id__in=all_blocked_ids)
             .count()
         )
 
@@ -138,6 +167,7 @@ def create_online_booking(
     adults_count=1,
     children_count=0,
     special_requests="",
+    session_id=None,
 ):
     """
     Creates an online booking for a guest after checking real-time availability.
@@ -147,7 +177,7 @@ def create_online_booking(
     with transaction.atomic():
         room = Room.objects.select_for_update().get(id=room_id, is_active=True)
 
-        if not check_room_availability(room.id, check_in_date, check_out_date):
+        if not check_room_availability(room.id, check_in_date, check_out_date, exclude_session_id=session_id):
             raise ValidationError(
                 f"Room {room.room_number} is not available for selected dates ({check_in_date} to {check_out_date})."
             )
@@ -218,6 +248,15 @@ def create_online_booking(
                 recorded_by="Online Guest",
                 notes="Bank transfer screenshot uploaded. Pending staff verification.",
             )
+
+        # Clean up temporary room holds
+        if session_id:
+            RoomHold.objects.filter(session_id=session_id).delete()
+        RoomHold.objects.filter(
+            room=room,
+            check_in_date__lt=check_out_date,
+            check_out_date__gt=check_in_date,
+        ).delete()
 
         # Dispatch automated email notifications to hotel staff and confirmation receipt to guest
         send_online_booking_submitted_email(booking, payment)

@@ -154,6 +154,7 @@ if USE_R2_STORAGE:
                 "default_acl": None,
                 "signature_version": "s3v4",
                 "querystring_auth": False,
+                "url_protocol": "https:",
             },
         },
         "staticfiles": {
