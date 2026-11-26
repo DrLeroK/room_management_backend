@@ -5,6 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.audit import record_audit_log
 from apps.rooms.models import Amenity, RoomType
 from apps.rooms.serializers import AmenitySerializer, RoomTypeSerializer
 from apps.users.permissions import IsManagerRole, IsOwnerRole, IsReceptionistRole
@@ -115,6 +116,43 @@ class HotelBankDetailsViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return [AllowAny()]
         return [IsAuthenticated(), IsOwnerRole()]
+
+    def perform_create(self, serializer):
+        bank = serializer.save()
+        record_audit_log(
+            action="SETTING_CHANGED",
+            entity_type="BankDetails",
+            entity_id=str(bank.id),
+            description=f"Hotel bank account '{bank.bank_name}' created by {self.request.user.username}",
+            actor=self.request.user,
+            request=self.request,
+            changes={"bank_name": bank.bank_name, "account_number": bank.account_number},
+        )
+
+    def perform_update(self, serializer):
+        bank = serializer.save()
+        record_audit_log(
+            action="SETTING_CHANGED",
+            entity_type="BankDetails",
+            entity_id=str(bank.id),
+            description=f"Hotel bank account '{bank.bank_name}' updated by {self.request.user.username}",
+            actor=self.request.user,
+            request=self.request,
+            changes={"bank_name": bank.bank_name, "is_active": bank.is_active},
+        )
+
+    def perform_destroy(self, instance):
+        bank_name = instance.bank_name
+        instance_id = instance.id
+        instance.delete()
+        record_audit_log(
+            action="SETTING_CHANGED",
+            entity_type="BankDetails",
+            entity_id=str(instance_id),
+            description=f"Hotel bank account '{bank_name}' deleted by {self.request.user.username}",
+            actor=self.request.user,
+            request=self.request,
+        )
 
 
 class HotelBankDetailsView(APIView):

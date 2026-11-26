@@ -9,11 +9,13 @@ from rest_framework.views import APIView
 
 from apps.content.models import HotelBankDetails
 from apps.content.serializers import HotelBankDetailsSerializer
+from apps.core.audit import record_audit_log
 from apps.core.idempotency import (
     get_cached_idempotency_response,
     get_idempotency_key,
     set_cached_idempotency_response,
 )
+from apps.core.notifications import create_in_app_notification
 from apps.core.validators import validate_file_upload
 from apps.payments.serializers import PaymentSerializer, VerifyPaymentRequestSerializer
 from apps.rooms.models import Room, RoomStatus
@@ -138,10 +140,33 @@ class OnlineBookingView(APIView):
         )
 
         context_serializer = BookingSerializer(booking, context={"request": request})
+        has_proof = bool(data.get("payment_proof") or data.get("transaction_reference"))
         msg = (
             "Online booking submitted! Payment screenshot received and pending staff verification."
-            if (data.get("payment_proof") or data.get("transaction_reference"))
+            if has_proof
             else "Booking created successfully!"
+        )
+
+        create_in_app_notification(
+            title=f"New Booking: #{booking.booking_reference}",
+            message=f"{booking.guest.full_name} submitted online booking #{booking.booking_reference} for Room {booking.room.room_number}. Proof attached: {'Yes' if has_proof else 'No'}.",
+            notification_type="BOOKING_SUBMITTED",
+            target_role="RECEPTIONIST",
+            link="/reception/payments" if has_proof else "/reception/bookings",
+        )
+        record_audit_log(
+            action="BOOKING_CREATED",
+            entity_type="Booking",
+            entity_id=booking.booking_reference,
+            description=f"Online booking #{booking.booking_reference} submitted by {booking.guest.full_name} for Room {booking.room.room_number}",
+            request=request,
+            changes={
+                "channel": "ONLINE",
+                "room_number": booking.room.room_number,
+                "guest_name": booking.guest.full_name,
+                "guest_phone": booking.guest.phone_number,
+                "total_amount": float(booking.total_amount),
+            },
         )
 
         response_payload = {"message": msg, "booking": context_serializer.data}
@@ -215,6 +240,29 @@ class VerifyPaymentView(APIView):
         booking_serializer = BookingSerializer(result["booking"], context={"request": request})
         payment_serializer = PaymentSerializer(result["payment"], context={"request": request})
 
+        action_verb = "Approved" if data["action"] == "APPROVE" else "Rejected"
+        create_in_app_notification(
+            title=f"Payment {action_verb}: #{result['booking'].booking_reference}",
+            message=f"Payment of {result['payment'].amount:.2f} ETB for booking #{result['booking'].booking_reference} ({result['booking'].guest.full_name}) was {action_verb.lower()} by {receptionist_name}.",
+            notification_type="PAYMENT_VERIFIED" if data["action"] == "APPROVE" else "PAYMENT_REJECTED",
+            target_role="RECEPTIONIST",
+            link="/reception/bookings" if data["action"] == "APPROVE" else "/reception/payments",
+        )
+        record_audit_log(
+            action="PAYMENT_VERIFIED" if data["action"] == "APPROVE" else "PAYMENT_REJECTED",
+            entity_type="Payment",
+            entity_id=str(result["payment"].id),
+            description=f"Payment for booking #{result['booking'].booking_reference} {action_verb.lower()} by {receptionist_name}. Notes: {data.get('notes', '')}",
+            actor=request.user,
+            request=request,
+            changes={
+                "action": data["action"],
+                "booking_reference": result["booking"].booking_reference,
+                "amount": float(result["payment"].amount),
+                "notes": data.get("notes", ""),
+            },
+        )
+
         return Response(
             {
                 "message": result["message"],
@@ -261,6 +309,27 @@ class WalkInCheckInView(APIView):
             notes=data.get("notes", ""),
         )
 
+        create_in_app_notification(
+            title=f"Walk-In Check-In: Room {booking.room.room_number}",
+            message=f"{booking.guest.full_name} checked into Room {booking.room.room_number} by {receptionist_name}.",
+            notification_type="CHECK_IN",
+            target_role="RECEPTIONIST",
+            link="/reception",
+        )
+        record_audit_log(
+            action="BOOKING_CHECK_IN",
+            entity_type="Booking",
+            entity_id=booking.booking_reference,
+            description=f"Walk-in check-in for {booking.guest.full_name} in Room {booking.room.room_number} by {receptionist_name}",
+            actor=request.user,
+            request=request,
+            changes={
+                "channel": "WALK_IN",
+                "room_number": booking.room.room_number,
+                "amount_paid": float(data.get("money_received", 0)),
+            },
+        )
+
         response_payload = {
             "message": "Walk-in check-in processed successfully!",
             "booking": BookingSerializer(booking, context={"request": request}).data,
@@ -296,6 +365,26 @@ class ReservationCheckInView(APIView):
             notes=data.get("notes", ""),
         )
 
+        create_in_app_notification(
+            title=f"Check-In: Room {booking.room.room_number}",
+            message=f"Reservation #{booking.booking_reference} ({booking.guest.full_name}) checked into Room {booking.room.room_number} by {receptionist_name}.",
+            notification_type="CHECK_IN",
+            target_role="RECEPTIONIST",
+            link="/reception",
+        )
+        record_audit_log(
+            action="BOOKING_CHECK_IN",
+            entity_type="Booking",
+            entity_id=booking.booking_reference,
+            description=f"Reservation #{booking.booking_reference} ({booking.guest.full_name}) checked in by {receptionist_name}",
+            actor=request.user,
+            request=request,
+            changes={
+                "room_number": booking.room.room_number,
+                "money_received": float(data.get("money_received", 0)),
+            },
+        )
+
         return Response(
             {
                 "message": f"Reservation {booking.booking_reference} checked in successfully!",
@@ -329,6 +418,27 @@ class CheckOutView(APIView):
             room_inspected=data.get("room_inspected", True),
             receptionist_name=receptionist_name,
             notes=data.get("notes", ""),
+        )
+
+        create_in_app_notification(
+            title=f"Check-Out: Room {booking.room.room_number}",
+            message=f"Guest {booking.guest.full_name} checked out from Room {booking.room.room_number} by {receptionist_name}. Room set to VACANT_DIRTY.",
+            notification_type="CHECK_OUT",
+            target_role="RECEPTIONIST",
+            link="/reception/rooms",
+        )
+        record_audit_log(
+            action="BOOKING_CHECK_OUT",
+            entity_type="Booking",
+            entity_id=booking.booking_reference,
+            description=f"Booking #{booking.booking_reference} ({booking.guest.full_name}) checked out from Room {booking.room.room_number} by {receptionist_name}",
+            actor=request.user,
+            request=request,
+            changes={
+                "additional_charges": float(data.get("additional_charges", 0)),
+                "final_amount_paid": float(data.get("final_amount_paid", 0)),
+                "room_inspected": data.get("room_inspected", True),
+            },
         )
 
         return Response(

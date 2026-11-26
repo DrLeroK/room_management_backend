@@ -145,3 +145,94 @@ def test_online_booking_rejection_dispatches_rejection_email_and_sms():
     assert "Update Regarding Booking" in reject_email.subject
     assert "tigist@example.com" in reject_email.to
     assert "Transaction reference not found in bank statement" in reject_email.body
+
+
+@pytest.mark.django_db
+def test_in_app_notifications_lifecycle(api_client, receptionist_user, django_user_model):
+    from apps.core.models import Notification
+    from apps.core.notifications import create_in_app_notification
+
+    # Create notifications
+    notif1 = create_in_app_notification(
+        title="New Booking #BK-101",
+        message="Guest Abebe booked Room 101.",
+        notification_type="BOOKING_SUBMITTED",
+        target_role="RECEPTIONIST",
+        link="/reception/payments",
+    )
+    notif2 = create_in_app_notification(
+        title="Payment Approved: #BK-102",
+        message="Payment verified by Staff.",
+        notification_type="PAYMENT_VERIFIED",
+        target_role="RECEPTIONIST",
+        link="/reception/bookings",
+    )
+
+    api_client.force_authenticate(user=receptionist_user)
+
+    # 1. List notifications
+    list_url = "/api/v1/notifications/"
+    res = api_client.get(list_url)
+    assert res.status_code == status.HTTP_200_OK
+    assert res.data["unread_count"] >= 2
+    assert any(n["id"] == notif1.id for n in res.data["results"])
+
+    # 2. Mark single notification as read
+    mark_read_url = f"/api/v1/notifications/{notif1.id}/mark-read/"
+    res_mark = api_client.post(mark_read_url)
+    assert res_mark.status_code == status.HTTP_200_OK
+    assert res_mark.data["notification"]["is_read"] is True
+
+    notif1.refresh_from_db()
+    assert notif1.is_read is True
+
+    # 3. Mark all as read
+    mark_all_url = "/api/v1/notifications/mark-all-read/"
+    res_all = api_client.post(mark_all_url)
+    assert res_all.status_code == status.HTTP_200_OK
+    assert res_all.data["unread_count"] == 0
+
+    notif2.refresh_from_db()
+    assert notif2.is_read is True
+
+
+@pytest.mark.django_db
+def test_audit_log_security_and_filtering(api_client, receptionist_user, owner_user):
+    from apps.core.audit import record_audit_log
+    from apps.core.models import AuditLog
+
+    # Record test audit logs
+    record_audit_log(
+        action="BOOKING_CREATED",
+        entity_type="Booking",
+        entity_id="BK-9999",
+        description="Booking created for testing audit",
+        actor=owner_user,
+        changes={"amount": 2500.0},
+    )
+    record_audit_log(
+        action="AUTH_LOGIN",
+        entity_type="Auth",
+        entity_id="1",
+        description="Owner logged in",
+        actor=owner_user,
+    )
+
+    # 1. Receptionist tries to access audit logs -> 403 Forbidden
+    api_client.force_authenticate(user=receptionist_user)
+    audit_url = "/api/v1/audit-logs/"
+    res_rec = api_client.get(audit_url)
+    assert res_rec.status_code == status.HTTP_403_FORBIDDEN
+
+    # 2. Owner accesses audit logs -> 200 OK
+    api_client.force_authenticate(user=owner_user)
+    res_owner = api_client.get(audit_url)
+    assert res_owner.status_code == status.HTTP_200_OK
+    assert res_owner.data["count"] >= 2
+
+    # 3. Filter by action
+    res_filter = api_client.get(f"{audit_url}?action=BOOKING_CREATED")
+    assert res_filter.status_code == status.HTTP_200_OK
+    for item in res_filter.data["results"]:
+        assert item["action"] == "BOOKING_CREATED"
+

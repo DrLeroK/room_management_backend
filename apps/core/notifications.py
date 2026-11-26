@@ -154,3 +154,31 @@ def send_payment_rejection_email(booking, payment, reason=""):
         logger.info(f"[NOTIFICATION] Payment rejection email sent to {guest.email}")
     except Exception as e:
         logger.error(f"[NOTIFICATION ERROR] Failed to send payment rejection email: {e}")
+
+
+def create_in_app_notification(
+    title,
+    message,
+    notification_type="SYSTEM",
+    target_role="",
+    recipient=None,
+    link="",
+):
+    """
+    Creates an in-app notification for a specific user or role broadcast.
+    """
+    try:
+        from apps.core.models import Notification
+
+        return Notification.objects.create(
+            recipient=recipient,
+            target_role=target_role,
+            title=title,
+            message=message,
+            notification_type=notification_type,
+            link=link,
+        )
+    except Exception as exc:
+        logger.error(f"[NOTIFICATION ERROR] Failed to create in-app notification: {exc}")
+        return None
+

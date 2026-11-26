@@ -9,6 +9,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from apps.core.audit import record_audit_log
 from apps.core.throttling import BruteForceLockoutThrottle, LoginRateThrottle
 
 from .models import UserRole
@@ -59,9 +60,26 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             response = super().post(request, *args, **kwargs)
             if response.status_code == status.HTTP_200_OK:
                 BruteForceLockoutThrottle.reset_failed_login(request, username)
+                user_obj = User.objects.filter(username=username).first()
+                if user_obj:
+                    record_audit_log(
+                        action="AUTH_LOGIN",
+                        entity_type="Auth",
+                        entity_id=str(user_obj.id),
+                        description=f"User '{user_obj.username}' ({user_obj.role}) logged in successfully",
+                        actor=user_obj,
+                        request=request,
+                    )
             return response
         except Exception:
             failed_count = BruteForceLockoutThrottle.record_failed_login(request, username)
+            record_audit_log(
+                action="AUTH_FAILED",
+                entity_type="Auth",
+                entity_id=username,
+                description=f"Failed login attempt for username '{username}'",
+                request=request,
+            )
             remaining = max(0, BruteForceLockoutThrottle.MAX_FAILED_ATTEMPTS - failed_count)
 
             if remaining == 0:
@@ -142,7 +160,16 @@ class UserViewSet(viewsets.ModelViewSet):
         target_role = serializer.validated_data.get("role", UserRole.RECEPTIONIST)
         if user.role == UserRole.MANAGER and target_role in [UserRole.OWNER, UserRole.ADMIN]:
             raise PermissionDenied("Managers are only permitted to create Receptionist or Manager accounts.")
-        serializer.save()
+        new_user = serializer.save()
+        record_audit_log(
+            action="USER_CREATED",
+            entity_type="User",
+            entity_id=str(new_user.id),
+            description=f"Staff account '{new_user.username}' ({new_user.role}) created by {user.username}",
+            actor=user,
+            request=self.request,
+            changes={"role": new_user.role, "email": new_user.email},
+        )
 
     def perform_update(self, serializer):
         previous_active = serializer.instance.is_active
@@ -183,6 +210,15 @@ class UserViewSet(viewsets.ModelViewSet):
         if not user.is_active:
             terminate_user_sessions_and_tokens(user)
         status_str = "activated" if user.is_active else "deactivated"
+        record_audit_log(
+            action="USER_UPDATED" if user.is_active else "USER_DEACTIVATED",
+            entity_type="User",
+            entity_id=str(user.id),
+            description=f"User account '{user.username}' was {status_str} by {request.user.username}",
+            actor=request.user,
+            request=request,
+            changes={"is_active": user.is_active},
+        )
         return Response(
             {
                 "message": f"User '{user.username}' has been successfully {status_str}.",

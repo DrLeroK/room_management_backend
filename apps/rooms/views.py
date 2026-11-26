@@ -9,6 +9,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.bookings.services import check_room_availability, find_available_rooms
+from apps.core.audit import record_audit_log
+from apps.core.notifications import create_in_app_notification
 from apps.users.permissions import IsManagerRole, IsReceptionistRole
 
 from .models import Amenity, Room, RoomHold, RoomType
@@ -103,10 +105,29 @@ class RoomViewSet(viewsets.ModelViewSet):
         new_status = serializer.validated_data["status"]
         notes = serializer.validated_data.get("notes", "")
 
+        old_status = room.status
         room.status = new_status
         if notes:
             room.notes = f"{room.notes}\n[Status Change]: {notes}".strip()
         room.save(update_fields=["status", "notes", "updated_at"])
+
+        record_audit_log(
+            action="ROOM_UPDATED",
+            entity_type="Room",
+            entity_id=room.room_number,
+            description=f"Room {room.room_number} status updated from {old_status} to {new_status} by {request.user.username}",
+            actor=request.user,
+            request=request,
+            changes={"previous_status": old_status, "new_status": new_status, "notes": notes},
+        )
+        if new_status in ["MAINTENANCE", "AVAILABLE", "DIRTY_CLEANING"]:
+            create_in_app_notification(
+                title=f"Room {room.room_number}: {new_status.replace('_', ' ').title()}",
+                message=f"Room {room.room_number} status was updated to {new_status} by {request.user.username}.",
+                notification_type="ROOM_STATUS",
+                target_role="RECEPTIONIST",
+                link="/reception/rooms",
+            )
 
         return Response(RoomSerializer(room).data, status=status.HTTP_200_OK)
 
