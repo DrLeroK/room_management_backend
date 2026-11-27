@@ -108,7 +108,11 @@ class HotelBankDetailsViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = HotelBankDetails.objects.all()
         # If unauthenticated or guest, only active accounts
-        if not (self.request.user and self.request.user.is_authenticated and self.request.user.role in ["ADMIN", "OWNER", "MANAGER", "RECEPTIONIST"]):
+        if not (
+            self.request.user
+            and self.request.user.is_authenticated
+            and self.request.user.role in ["ADMIN", "OWNER", "MANAGER", "RECEPTIONIST"]
+        ):
             queryset = queryset.filter(is_active=True)
         return queryset
 
@@ -177,7 +181,9 @@ class HotelBankDetailsView(APIView):
 
     def put(self, request):
         bank_details, created = HotelBankDetails.objects.get_or_create(id=1)
-        serializer = HotelBankDetailsSerializer(bank_details, data=request.data, partial=True, context={"request": request})
+        serializer = HotelBankDetailsSerializer(
+            bank_details, data=request.data, partial=True, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -236,7 +242,9 @@ class GalleryItemViewSet(viewsets.ModelViewSet):
             if category_param.isdigit():
                 queryset = queryset.filter(category_id=int(category_param))
             else:
-                queryset = queryset.filter(category__name__iexact=category_param) | queryset.filter(category__slug__iexact=category_param)
+                queryset = queryset.filter(category__name__iexact=category_param) | queryset.filter(
+                    category__slug__iexact=category_param
+                )
         return queryset
 
     def get_permissions(self):

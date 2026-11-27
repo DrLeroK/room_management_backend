@@ -233,4 +233,3 @@ def test_audit_log_security_and_filtering(api_client, receptionist_user, owner_u
     assert res_filter.status_code == status.HTTP_200_OK
     for item in res_filter.data["results"]:
         assert item["action"] == "BOOKING_CREATED"
-

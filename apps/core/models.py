@@ -127,4 +127,3 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.created_at.strftime('%Y-%m-%d %H:%M')} | {self.actor_email or 'System'} | {self.action} on {self.entity_type} {self.entity_id}"
-

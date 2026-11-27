@@ -243,4 +243,3 @@ class RoomHoldViewSet(viewsets.GenericViewSet):
             count, _ = RoomHold.objects.filter(id=hold_id).delete()
             return Response({"released": True, "count": count}, status=status.HTTP_200_OK)
         return Response({"error": "session_id or hold_id is required."}, status=status.HTTP_400_BAD_REQUEST)
-

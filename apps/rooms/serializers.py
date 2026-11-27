@@ -119,4 +119,3 @@ class RoomHoldSerializer(serializers.ModelSerializer):
                 {"check_out_date": "Check-out date must be strictly after check-in date."}
             )
         return data
-

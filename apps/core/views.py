@@ -28,9 +28,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
         role = getattr(user, "role", "")
         # Filter for direct recipient, matching role, or general staff (blank target_role)
-        return Notification.objects.filter(
-            Q(recipient=user) | Q(target_role=role) | Q(target_role="")
-        ).order_by("-created_at")
+        return Notification.objects.filter(Q(recipient=user) | Q(target_role=role) | Q(target_role="")).order_by(
+            "-created_at"
+        )
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

@@ -105,4 +105,3 @@ class RoomAPITest(APITestCase):
         res_release = self.client.post(release_url, {"session_id": "session-test-123"}, format="json")
         self.assertEqual(res_release.status_code, status.HTTP_200_OK)
         self.assertTrue(res_release.data["released"])
-

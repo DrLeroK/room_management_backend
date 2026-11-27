@@ -181,4 +181,3 @@ def create_in_app_notification(
     except Exception as exc:
         logger.error(f"[NOTIFICATION ERROR] Failed to create in-app notification: {exc}")
         return None
-
