@@ -149,7 +149,6 @@ def test_online_booking_rejection_dispatches_rejection_email_and_sms():
 
 @pytest.mark.django_db
 def test_in_app_notifications_lifecycle(api_client, receptionist_user, django_user_model):
-    from apps.core.models import Notification
     from apps.core.notifications import create_in_app_notification
 
     # Create notifications
@@ -199,7 +198,6 @@ def test_in_app_notifications_lifecycle(api_client, receptionist_user, django_us
 @pytest.mark.django_db
 def test_audit_log_security_and_filtering(api_client, receptionist_user, owner_user):
     from apps.core.audit import record_audit_log
-    from apps.core.models import AuditLog
 
     # Record test audit logs
     record_audit_log(
