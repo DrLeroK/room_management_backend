@@ -15,12 +15,15 @@ from apps.bookings.models import (
 )
 from apps.content.models import (
     FAQ,
+    ContactInquiry,
     GalleryCategory,
     GalleryItem,
+    HotelBankDetails,
     HotelProfile,
     Partner,
     Testimonial,
 )
+from apps.core.models import Notification
 from apps.guests.models import Guest, IdentificationType
 from apps.payments.models import Payment, PaymentStatus, PaymentType
 from apps.rooms.models import Amenity, Room, RoomStatus, RoomType
@@ -132,51 +135,69 @@ class Command(BaseCommand):
         )
 
         # 1. Seed Hotel Profile
-        profile, _ = HotelProfile.objects.get_or_create(
-            id=1,
-            defaults={
-                "name": "StayCraft Hotel & Bedroom Resort",
-                "tagline": "Luxury, Comfort, & Elegance in Every Stay",
-                "about_us": "StayCraft Hotel offers world-class bedroom accommodations, gourmet dining, spa treatments, and executive conference spaces located in the heart of Addis Ababa.",
-                "address": "Bole Road, Near Friendship Mall, Addis Ababa, Ethiopia",
-                "contact_phone": "+251 911 223 344",
-                "contact_email": "reservations@staycrafthotel.com",
-                "facebook_url": "https://facebook.com/staycrafthotel",
-                "instagram_url": "https://instagram.com/staycrafthotel",
-                "twitter_url": "https://twitter.com/staycrafthotel",
-            },
-        )
-        self.stdout.write(self.style.SUCCESS("Seeded Hotel Profile content."))
+        profile_data = {
+            "name": "StayCraft Luxury Hotel & Spa",
+            "tagline": "Refined Ethiopian Hospitality & Modern Luxury",
+            "about_us": "StayCraft Hotel offers world-class bedroom accommodations, gourmet dining, restorative spa treatments, and executive conference spaces located in the heart of Addis Ababa.",
+            "address": "Bole Road, Near Friendship Business Center, Addis Ababa, Ethiopia",
+            "contact_phone": "+251 911 223 344",
+            "contact_email": "reservations@staycrafthotel.com",
+            "hero_image": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1600&q=80",
+            "facebook_url": "https://facebook.com/staycrafthotel",
+            "instagram_url": "https://instagram.com/staycrafthotel",
+            "twitter_url": "https://twitter.com/staycrafthotel",
+        }
+        profile, created = HotelProfile.objects.get_or_create(id=1, defaults=profile_data)
+        if not created:
+            for k, v in profile_data.items():
+                setattr(profile, k, v)
+            profile.save()
+        self.stdout.write(self.style.SUCCESS("Seeded Hotel Profile content with hero image."))
 
-        # 2. Seed Testimonials
+        # 2. Seed Testimonials with genuine guest avatars
         testimonials_data = [
             {
                 "guest_name": "Solomon Haile",
-                "guest_title": "Business Traveler",
+                "guest_title": "Business Executive",
                 "rating": 5,
-                "comment": "The Executive King Suite was exceptionally clean and comfortable. Fast Wi-Fi and seamless online booking with instant SMS confirmation!",
+                "comment": "The Executive King Suite was exceptionally clean, comfortable, and quiet. Fast Wi-Fi and seamless online booking with instant SMS confirmation!",
+                "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
                 "display_order": 1,
             },
             {
                 "guest_name": "Elena Rostova",
-                "guest_title": "Tourist & Photographer",
+                "guest_title": "Travel Journalist & Photographer",
                 "rating": 5,
-                "comment": "Stunning balcony view, polite front desk receptionists, and delicious breakfast buffet. Will definitely return to StayCraft!",
+                "comment": "Stunning balcony view, polite front desk receptionists, and delicious breakfast buffet. Will definitely return to StayCraft next time I visit Ethiopia!",
+                "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80",
                 "display_order": 2,
             },
             {
                 "guest_name": "Marcus Vance",
-                "guest_title": "Corporate Executive",
+                "guest_title": "Corporate Consultant",
                 "rating": 5,
-                "comment": "Loved the quick receptionist check-in experience and modern room key card access. Top tier service in Addis Ababa.",
+                "comment": "Loved the quick receptionist check-in experience and modern room key card access. Top tier 5-star service in Addis Ababa.",
+                "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
                 "display_order": 3,
+            },
+            {
+                "guest_name": "Bethel Tsegaye",
+                "guest_title": "Diplomatic Attaché",
+                "rating": 5,
+                "comment": "Exquisite hospitality, reliable security, and top-of-the-line amenities. The presidential penthouse surpassed every expectation.",
+                "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80",
+                "display_order": 4,
             },
         ]
         for t_data in testimonials_data:
-            Testimonial.objects.get_or_create(guest_name=t_data["guest_name"], defaults=t_data)
-        self.stdout.write(self.style.SUCCESS("Seeded Testimonials."))
+            t_obj, t_created = Testimonial.objects.get_or_create(guest_name=t_data["guest_name"], defaults=t_data)
+            if not t_created:
+                for k, v in t_data.items():
+                    setattr(t_obj, k, v)
+                t_obj.save()
+        self.stdout.write(self.style.SUCCESS("Seeded Testimonials with realistic photos."))
 
-        # 3. Seed Gallery Categories & Items
+        # 3. Seed Gallery Categories & Items with High-Resolution Photos
         cat_bed, _ = GalleryCategory.objects.get_or_create(
             name="Bedrooms & Suites", defaults={"slug": "bedrooms", "display_order": 1}
         )
@@ -186,36 +207,129 @@ class Command(BaseCommand):
         cat_spa, _ = GalleryCategory.objects.get_or_create(
             name="Spa & Fitness", defaults={"slug": "spa", "display_order": 3}
         )
+        cat_arch, _ = GalleryCategory.objects.get_or_create(
+            name="Architecture & Grounds", defaults={"slug": "architecture", "display_order": 4}
+        )
 
         gallery_items_data = [
             {
                 "title": "Executive King Bedroom",
                 "category": cat_bed,
-                "caption": "Spacious suite with king mattress and ambient lighting.",
+                "caption": "Spacious master bedroom with plush king mattress, ambient lighting, and panoramic city views.",
+                "image": "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80",
                 "display_order": 1,
             },
             {
-                "title": "Penthouse Ocean View Terrace",
+                "title": "Presidential Penthouse Suite",
                 "category": cat_bed,
-                "caption": "Top-floor panoramic city terrace view.",
+                "caption": "Top-floor panoramic city terrace view with private jacuzzi and lounge parlor.",
+                "image": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80",
                 "display_order": 2,
+            },
+            {
+                "title": "Deluxe Double Bedroom",
+                "category": cat_bed,
+                "caption": "Contemporary elegance featuring premium queen bedding and ergonomic executive workstation.",
+                "image": "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80",
+                "display_order": 3,
             },
             {
                 "title": "Gourmet Restaurant & Bar",
                 "category": cat_dine,
-                "caption": "International & local cuisine prepared by master chefs.",
-                "display_order": 3,
+                "caption": "International & traditional Ethiopian gourmet cuisine prepared by award-winning chefs.",
+                "image": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
+                "display_order": 4,
             },
             {
-                "title": "Luxury Spa & Heated Bath",
+                "title": "Rooftop Sunset Lounge & Cocktail Bar",
+                "category": cat_dine,
+                "caption": "Artisanal cocktails, fine wine selection, and sweeping skyline sunset views.",
+                "image": "https://images.unsplash.com/photo-1572116469696-31de0f17cc34?auto=format&fit=crop&w=1200&q=80",
+                "display_order": 5,
+            },
+            {
+                "title": "Luxury Spa & Hydro-Massage Bath",
                 "category": cat_spa,
-                "caption": "Relaxation massage center and hydro-tub.",
-                "display_order": 4,
+                "caption": "Holistic relaxation treatments, herbal steam baths, and therapeutic massages.",
+                "image": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80",
+                "display_order": 6,
+            },
+            {
+                "title": "Skyline Heated Infinity Pool",
+                "category": cat_spa,
+                "caption": "Heated swimming pool with private cabanas and deck loungers.",
+                "image": "https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1200&q=80",
+                "display_order": 7,
+            },
+            {
+                "title": "Grand Hotel Lobby & Reception",
+                "category": cat_arch,
+                "caption": "Welcoming marble atrium, gold-accented chandeliers, and 24/7 concierge desk.",
+                "image": "https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=1200&q=80",
+                "display_order": 8,
             },
         ]
         for g_data in gallery_items_data:
-            GalleryItem.objects.get_or_create(title=g_data["title"], defaults=g_data)
-        self.stdout.write(self.style.SUCCESS("Seeded Gallery Categories & Items."))
+            g_obj, g_created = GalleryItem.objects.get_or_create(title=g_data["title"], defaults=g_data)
+            if not g_created:
+                for k, v in g_data.items():
+                    setattr(g_obj, k, v)
+                g_obj.save()
+        self.stdout.write(self.style.SUCCESS("Seeded Gallery Categories & Items with luxury photography."))
+
+        # 3b. Seed Multiple Bank Accounts for Payments
+        banks_data = [
+            {
+                "bank_name": "Commercial Bank of Ethiopia (CBE)",
+                "account_name": "StayCraft Hotel PLC",
+                "account_number": "1000123456789",
+                "branch_name": "Finfine Main Branch",
+                "swift_code": "CBETETAA",
+                "instructions": "Transfer total reservation amount via CBE Mobile or CBE Birr. Upload screenshot of successful transaction debit.",
+                "is_active": True,
+                "display_order": 1,
+            },
+            {
+                "bank_name": "Telebirr SuperApp",
+                "account_name": "StayCraft Hotel & Resort",
+                "account_number": "0911223344",
+                "branch_name": "Ethio Telecom Digital",
+                "instructions": "Send payment to Merchant / Account 0911223344 on Telebirr app. Attach receipt screenshot.",
+                "is_active": True,
+                "display_order": 2,
+            },
+            {
+                "bank_name": "Awash Bank",
+                "account_name": "StayCraft Hospitality Services",
+                "account_number": "01304123456700",
+                "branch_name": "Bole Medhanialem Branch",
+                "swift_code": "AWINETA",
+                "instructions": "Transfer via Awash Online or Mobile Banking. Ensure transaction description specifies your booking reference.",
+                "is_active": True,
+                "display_order": 3,
+            },
+            {
+                "bank_name": "Bank of Abyssinia (BOA)",
+                "account_name": "StayCraft Hotel Operations",
+                "account_number": "20938491",
+                "branch_name": "Bole Atlas Branch",
+                "swift_code": "ABYSETAA",
+                "instructions": "Transfer via BOA mobile banking app. Front desk verifies within 15 minutes.",
+                "is_active": True,
+                "display_order": 4,
+            },
+        ]
+        for idx, b_data in enumerate(banks_data, start=1):
+            b_obj = HotelBankDetails.objects.filter(id=idx).first()
+            if not b_obj:
+                b_obj = HotelBankDetails.objects.filter(bank_name=b_data["bank_name"]).first()
+            if b_obj:
+                for k, v in b_data.items():
+                    setattr(b_obj, k, v)
+                b_obj.save()
+            else:
+                HotelBankDetails.objects.create(**b_data)
+        self.stdout.write(self.style.SUCCESS("Seeded Hotel Bank Accounts (CBE, Telebirr, Awash, BOA)."))
 
         # 4. Seed Partners & Sponsors
         partners_data = [
@@ -320,50 +434,61 @@ class Command(BaseCommand):
             amenities_objs.append(obj)
         self.stdout.write(self.style.SUCCESS(f"Seeded {len(amenities_objs)} amenities."))
 
-        # 7. Seed Room Types
+        # 7. Seed Room Types with Luxury Unsplash Photos & ETB Pricing
         room_types_data = [
             {
                 "name": "Standard Single Bedroom",
                 "code": "STD_SGL",
-                "description": "Cozy room ideal for solo travelers with ergonomic desk and single bed.",
-                "base_price_per_night": 50.00,
+                "description": "Cozy, soundproof room designed for solo travelers with ergonomic executive desk, smart TV, and premium single bedding.",
+                "base_price_per_night": 1500.00,
                 "max_occupancy": 1,
+                "image": "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=1200&q=80",
             },
             {
                 "name": "Deluxe Double Bedroom",
                 "code": "DLX_DBL",
-                "description": "Spacious room featuring a queen bed, seating area, and street view.",
-                "base_price_per_night": 85.00,
+                "description": "Spacious room featuring a plush queen-sized bed, seating area, ambient smart lighting, and city street view.",
+                "base_price_per_night": 2800.00,
                 "max_occupancy": 2,
+                "image": "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=1200&q=80",
             },
             {
                 "name": "Executive King Suite",
                 "code": "EXEC_KNG",
-                "description": "Luxury suite with King bed, ocean view balcony, mini bar, and jacuzzi.",
-                "base_price_per_night": 150.00,
+                "description": "Luxury suite with orthopedic King bed, private balcony, marble bathroom, mini bar, espresso station, and jacuzzi.",
+                "base_price_per_night": 4500.00,
                 "max_occupancy": 2,
+                "image": "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1200&q=80",
             },
             {
                 "name": "Family Suite Bedroom",
                 "code": "FAM_STE",
-                "description": "Two connected bedrooms with two queen beds, extra wardrobe, and living area.",
-                "base_price_per_night": 210.00,
+                "description": "Two connected bedrooms with two queen beds, extra wardrobe, expansive living lounge, and dining nook.",
+                "base_price_per_night": 6800.00,
                 "max_occupancy": 4,
+                "image": "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=1200&q=80",
             },
             {
                 "name": "Presidential Penthouse",
                 "code": "PRES_PENT",
-                "description": "Top floor suite with private terrace, hot tub, panoramic ocean view, and butler service.",
-                "base_price_per_night": 450.00,
+                "description": "Top floor grand suite with private terrace, heated jacuzzi, panoramic Addis Ababa skyline views, VIP chauffeur, and dedicated butler.",
+                "base_price_per_night": 15000.00,
                 "max_occupancy": 4,
+                "image": "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=80",
             },
         ]
 
         room_type_objs = {}
         for rt_data in room_types_data:
-            obj, _ = RoomType.objects.get_or_create(code=rt_data["code"], defaults=rt_data)
+            obj, created = RoomType.objects.get_or_create(code=rt_data["code"], defaults=rt_data)
+            if not created:
+                for k, v in rt_data.items():
+                    setattr(obj, k, v)
+                obj.save()
             room_type_objs[rt_data["code"]] = obj
-        self.stdout.write(self.style.SUCCESS(f"Seeded {len(room_type_objs)} room types."))
+        self.stdout.write(
+            self.style.SUCCESS(f"Seeded {len(room_type_objs)} room types with genuine photos & ETB prices.")
+        )
 
         # 8. Seed Rooms across 3 Floors
         rooms_list = [
@@ -595,9 +720,60 @@ class Command(BaseCommand):
             recorded_by="Online Guest",
         )
 
+        # 11. Seed In-App Notifications for Reception and Manager Dashboards
+        notif_items = [
+            {
+                "title": "Welcome to StayCraft Management System",
+                "message": "System running with Zero-Trust RBAC, real-time live board, and multi-bank payment verifications.",
+                "notification_type": "SYSTEM",
+                "target_role": "MANAGER",
+                "link": "/manager",
+            },
+            {
+                "title": "New Online Booking #BK-998822 Submitted",
+                "message": "Guest Sarah Connor uploaded bank transfer proof for Room 204. Pending verification.",
+                "notification_type": "BOOKING",
+                "target_role": "RECEPTIONIST",
+                "link": "/reception/payments",
+            },
+            {
+                "title": "New Guest Inquiry: Airport Shuttle Pickup",
+                "message": "From Dawit Bekele (dawit@example.com): Inquiring about VIP airport pickup schedule for upcoming stay.",
+                "notification_type": "SYSTEM",
+                "target_role": "RECEPTIONIST",
+                "link": "/manager/inquiries",
+            },
+        ]
+        for n_data in notif_items:
+            Notification.objects.get_or_create(title=n_data["title"], defaults=n_data)
+        self.stdout.write(self.style.SUCCESS("Seeded sample in-app notifications."))
+
+        # 12. Seed Guest Inquiries
+        inquiry_items = [
+            {
+                "name": "Dawit Bekele",
+                "email": "dawit@example.com",
+                "phone": "+251911887766",
+                "subject": "Airport Shuttle Pickup Request",
+                "message": "Hello, I will be landing at Bole International Airport on Ethiopian Airlines flight ET 500 at 7:30 PM. Does the hotel provide an executive airport pickup shuttle?",
+                "status": ContactInquiry.StatusChoices.NEW,
+            },
+            {
+                "name": "Emily Chen",
+                "email": "emily.chen@globaltech.org",
+                "phone": "+14155552671",
+                "subject": "Conference Room & Executive Catering Inquiry",
+                "message": "We are hosting an East African tech symposium for 25 executives next month and would like to reserve meeting facilities along with 10 executive suites.",
+                "status": ContactInquiry.StatusChoices.IN_PROGRESS,
+            },
+        ]
+        for inq in inquiry_items:
+            ContactInquiry.objects.get_or_create(email=inq["email"], subject=inq["subject"], defaults=inq)
+        self.stdout.write(self.style.SUCCESS("Seeded sample guest inquiries."))
+
         self.stdout.write(
             self.style.SUCCESS(
-                "Successfully seeded bookings, check-ins, check-outs, CMS landing page content, and payment verifications."
+                "Successfully seeded bookings, check-ins, check-outs, CMS landing page content, notifications, and payment verifications."
             )
         )
         self.stdout.write(self.style.SUCCESS("Bedroom Management Database is ready!"))

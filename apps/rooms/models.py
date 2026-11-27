@@ -38,7 +38,7 @@ class RoomType(TimeStampedModel):
         ordering = ["base_price_per_night", "name"]
 
     def __str__(self):
-        return f"{self.name} (${self.base_price_per_night}/night)"
+        return f"{self.name} ({self.base_price_per_night} ETB/night)"
 
 
 class Room(TimeStampedModel):

@@ -20,7 +20,7 @@ def send_payment_verification_sms(booking, payment):
     phone_number = guest.phone_number
 
     message = (
-        f"Hello {guest.full_name}, your bank transfer payment of ${payment.amount:.2f} "
+        f"Hello {guest.full_name}, your bank transfer payment of {payment.amount:.2f} ETB "
         f"for Booking {booking.booking_reference} has been VERIFIED! "
         f"Your Bedroom #{room.room_number} ({room.room_type.name}) is reserved for stay from "
         f"{booking.check_in_date.strftime('%b %d, %Y')} to {booking.check_out_date.strftime('%b %d, %Y')}. "

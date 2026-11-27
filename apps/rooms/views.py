@@ -24,7 +24,30 @@ from .serializers import (
 )
 
 
-class AmenityViewSet(viewsets.ModelViewSet):
+class PublicReadAuthMixin:
+    """
+    Relaxes authentication for public read operations (GET, HEAD, OPTIONS).
+    If an expired or stale Bearer token is provided by a public visitor,
+    this prevents DRF SimpleJWT from halting with 401 Unauthorized before
+    evaluating public AllowAny permissions.
+    """
+
+    def get_authenticators(self):
+        if (
+            self.request
+            and self.request.method in ("GET", "HEAD", "OPTIONS")
+            and getattr(self, "action", None)
+            in [
+                "list",
+                "retrieve",
+                None,
+            ]
+        ):
+            return []
+        return super().get_authenticators()
+
+
+class AmenityViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     """
     Hotel Amenities viewset. Read access for receptionists, write access for managers.
     """
@@ -40,7 +63,7 @@ class AmenityViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsManagerRole()]
 
 
-class RoomTypeViewSet(viewsets.ModelViewSet):
+class RoomTypeViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     """
     Staff / Owner viewset for managing Room Types and pricing rules.
     Public can view types and pricing; write access restricted to managers.
@@ -132,7 +155,7 @@ class RoomViewSet(viewsets.ModelViewSet):
         return Response(RoomSerializer(room).data, status=status.HTTP_200_OK)
 
 
-class PublicRoomAvailabilityView(APIView):
+class PublicRoomAvailabilityView(PublicReadAuthMixin, APIView):
     """
     Public endpoint for guests to check room existence, real-time availability, and rates.
     """

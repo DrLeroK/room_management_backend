@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.audit import record_audit_log
+from apps.core.notifications import create_in_app_notification
 from apps.rooms.models import Amenity, RoomType
 from apps.rooms.serializers import AmenitySerializer, RoomTypeSerializer
 from apps.users.permissions import IsManagerRole, IsOwnerRole, IsReceptionistRole
@@ -32,7 +33,30 @@ from .serializers import (
 )
 
 
-class LandingPageView(APIView):
+class PublicReadAuthMixin:
+    """
+    Relaxes authentication for public read operations (GET, HEAD, OPTIONS).
+    If an expired or stale Bearer token is provided by a public visitor,
+    this prevents DRF SimpleJWT from halting with 401 Unauthorized before
+    evaluating public AllowAny permissions.
+    """
+
+    def get_authenticators(self):
+        if (
+            self.request
+            and self.request.method in ("GET", "HEAD", "OPTIONS")
+            and getattr(self, "action", None)
+            in [
+                "list",
+                "retrieve",
+                None,
+            ]
+        ):
+            return []
+        return super().get_authenticators()
+
+
+class LandingPageView(PublicReadAuthMixin, APIView):
     """
     Composite API supplying all landing page content to the guest frontend.
     """
@@ -72,7 +96,7 @@ class LandingPageView(APIView):
         )
 
 
-class HotelProfileView(APIView):
+class HotelProfileView(PublicReadAuthMixin, APIView):
     """
     Hotel profile view. Public can read; only Managers/Owners can update.
     """
@@ -94,7 +118,7 @@ class HotelProfileView(APIView):
         return Response(serializer.data)
 
 
-class HotelBankDetailsViewSet(viewsets.ModelViewSet):
+class HotelBankDetailsViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     """
     ViewSet to manage multiple hotel bank accounts (CBE, Telebirr, Awash, etc.).
     Public can view active accounts; Owner/Admin can create, edit, or delete accounts.
@@ -159,7 +183,7 @@ class HotelBankDetailsViewSet(viewsets.ModelViewSet):
         )
 
 
-class HotelBankDetailsView(APIView):
+class HotelBankDetailsView(PublicReadAuthMixin, APIView):
     """
     View to inspect or update hotel bank details. Public GET for transfer info; PUT requires Owner/Admin.
     """
@@ -189,7 +213,7 @@ class HotelBankDetailsView(APIView):
         return Response(serializer.data)
 
 
-class PublicBankDetailsView(APIView):
+class PublicBankDetailsView(PublicReadAuthMixin, APIView):
     """
     Public endpoint for guests to view bank details for payment transfers.
     """
@@ -207,7 +231,7 @@ class PublicBankDetailsView(APIView):
         return Response(data)
 
 
-class TestimonialViewSet(viewsets.ModelViewSet):
+class TestimonialViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     queryset = Testimonial.objects.filter(is_active=True)
     serializer_class = TestimonialSerializer
     filter_backends = [filters.OrderingFilter]
@@ -219,7 +243,7 @@ class TestimonialViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsManagerRole()]
 
 
-class GalleryCategoryViewSet(viewsets.ModelViewSet):
+class GalleryCategoryViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     queryset = GalleryCategory.objects.all()
     serializer_class = GalleryCategorySerializer
 
@@ -229,7 +253,7 @@ class GalleryCategoryViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsManagerRole()]
 
 
-class GalleryItemViewSet(viewsets.ModelViewSet):
+class GalleryItemViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     serializer_class = GalleryItemSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["title", "caption", "category__name"]
@@ -253,7 +277,7 @@ class GalleryItemViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsManagerRole()]
 
 
-class PartnerViewSet(viewsets.ModelViewSet):
+class PartnerViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     queryset = Partner.objects.filter(is_active=True)
     serializer_class = PartnerSerializer
     filter_backends = [filters.OrderingFilter]
@@ -265,7 +289,7 @@ class PartnerViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated(), IsManagerRole()]
 
 
-class FAQViewSet(viewsets.ModelViewSet):
+class FAQViewSet(PublicReadAuthMixin, viewsets.ModelViewSet):
     queryset = FAQ.objects.filter(is_active=True)
     serializer_class = FAQSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -283,6 +307,11 @@ class ContactInquiryView(APIView):
     Public POST to submit a contact inquiry. Staff GET to view received messages.
     """
 
+    def get_authenticators(self):
+        if self.request and self.request.method == "POST":
+            return []
+        return super().get_authenticators()
+
     def get_permissions(self):
         if self.request.method == "POST":
             return [AllowAny()]
@@ -293,6 +322,34 @@ class ContactInquiryView(APIView):
         serializer = ContactInquirySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         inquiry = serializer.save(status=ContactInquiry.StatusChoices.NEW)
+
+        subject_preview = inquiry.subject.strip() if inquiry.subject else "General Inquiry"
+        message_preview = (inquiry.message[:90] + "...") if len(inquiry.message) > 90 else inquiry.message
+
+        create_in_app_notification(
+            title=f"New Guest Inquiry: {subject_preview}",
+            message=f"From {inquiry.name} ({inquiry.email}): {message_preview}",
+            notification_type="SYSTEM",
+            target_role="RECEPTIONIST",
+            link="/manager/inquiries",
+        )
+        create_in_app_notification(
+            title=f"New Guest Inquiry: {subject_preview}",
+            message=f"From {inquiry.name} ({inquiry.email}): {message_preview}",
+            notification_type="SYSTEM",
+            target_role="MANAGER",
+            link="/manager/inquiries",
+        )
+
+        record_audit_log(
+            action="GUEST_INQUIRY_CREATED",
+            entity_type="ContactInquiry",
+            entity_id=str(inquiry.id),
+            description=f"Guest inquiry from '{inquiry.name}' ({inquiry.email}) received.",
+            actor=None,
+            request=request,
+            changes={"subject": inquiry.subject, "name": inquiry.name, "email": inquiry.email},
+        )
 
         return Response(
             {

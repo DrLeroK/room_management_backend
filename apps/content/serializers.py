@@ -15,9 +15,20 @@ from .models import (
 def resolve_media_url(file_field, request=None):
     if not file_field:
         return None
-    url = str(file_field.url).strip()
+    name = getattr(file_field, "name", "")
+    if name and (name.startswith("http://") or name.startswith("https://")):
+        return name
+    try:
+        url = str(file_field.url).strip()
+    except Exception:
+        url = str(name).strip()
+    if not url:
+        return None
     if url.startswith("//"):
         return f"https:{url}"
+    if "/http://" in url or "/https://" in url:
+        idx = url.find("http")
+        return url[idx:]
     if url.startswith("http://") or url.startswith("https://"):
         return url
     if request:

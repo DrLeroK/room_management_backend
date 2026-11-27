@@ -202,9 +202,14 @@ DJANGO_ENV=production python manage.py check --deploy
 
 ---
 
-## 🔑 Pre-Seeded System Accounts
+## 🔑 Pre-Seeded System Accounts & Luxury Demo Data
 
-Execute `python manage.py seed_db` to populate test accounts:
+Execute `python manage.py seed_db --force` to populate complete test accounts, luxury room types with curated Unsplash photography, multi-bank accounts (CBE, Telebirr, Awash, BOA), testimonials, FAQs, in-app notifications, and guest inquiries:
+
+```bash
+# Seed or refresh the complete production demo dataset
+python manage.py seed_db --force
+```
 
 | Username | Password | Role | Description |
 | :--- | :--- | :--- | :--- |
@@ -213,6 +218,13 @@ Execute `python manage.py seed_db` to populate test accounts:
 | `manager` | `manager12345` | `MANAGER` | Hotel Manager |
 | `receptionist1` | `receptionist12345` | `RECEPTIONIST` | Senior Receptionist (Helen Tesfaye) |
 | `receptionist2` | `receptionist12345` | `RECEPTIONIST` | Front Desk Receptionist (Yared Alemu) |
+
+---
+
+## 🇪🇹 Currency Localization & Public Relaxation
+- **Ethiopian Birr (ETB)**: All models, notifications, and templates standardly format amounts in `ETB` (e.g. `1,500.00 ETB`).
+- **Resilient Public Content Browsing**: Public endpoints implement `PublicReadAuthMixin`, returning content anonymously without triggering 401s when cookies or stale tokens are present.
+- **Inquiry Notifications**: Client contact inquiries dispatch real-time in-app notifications to all `RECEPTIONIST` and `MANAGER` users and record audit logs.
 
 ---
 

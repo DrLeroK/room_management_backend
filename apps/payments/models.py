@@ -50,6 +50,4 @@ class Payment(TimeStampedModel):
         ordering = ["-payment_date"]
 
     def __str__(self):
-        return (
-            f"{self.transaction_id} - ${self.amount} ({self.get_payment_type_display()}) [{self.get_status_display()}]"
-        )
+        return f"{self.transaction_id} - {self.amount} ETB ({self.get_payment_type_display()}) [{self.get_status_display()}]"

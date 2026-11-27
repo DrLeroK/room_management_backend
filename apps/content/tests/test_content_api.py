@@ -93,6 +93,8 @@ class ContentAPITest(APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
 
     def test_contact_inquiry_submission(self):
+        from apps.core.models import Notification
+
         url = reverse("contact-inquiry")
         payload = {
             "name": "Haile Gebrselassie",
@@ -105,3 +107,26 @@ class ContentAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(ContactInquiry.objects.count(), 1)
         self.assertEqual(ContactInquiry.objects.first().name, "Haile Gebrselassie")
+
+        # Verify in-app notifications dispatched to RECEPTIONIST and MANAGER
+        self.assertTrue(
+            Notification.objects.filter(target_role="RECEPTIONIST", title__contains="Haile").exists()
+            or Notification.objects.filter(target_role="RECEPTIONIST", message__contains="Haile").exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(target_role="MANAGER", title__contains="Haile").exists()
+            or Notification.objects.filter(target_role="MANAGER", message__contains="Haile").exists()
+        )
+
+    def test_public_content_accessible_with_stale_token(self):
+        """
+        Public visitors with stale, malformed, or expired JWT tokens in headers
+        must never receive 401 on public endpoints.
+        """
+        self.client.logout()
+        stale_headers = {"HTTP_AUTHORIZATION": "Bearer invalid.or.expired.jwt.token"}
+
+        for route_name in ["landing-page", "testimonial-list", "gallery-list", "partner-list", "faq-list"]:
+            url = reverse(route_name)
+            response = self.client.get(url, **stale_headers)
+            self.assertEqual(response.status_code, status.HTTP_200_OK, f"Failed on route {route_name}")
