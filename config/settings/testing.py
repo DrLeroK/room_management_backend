@@ -24,3 +24,14 @@ CACHES = {
 
 # In-memory email backend for inspecting outbound confirmation emails
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+
+# Fast in-memory storage for test uploads without remote S3/R2 network calls
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
