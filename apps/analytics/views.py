@@ -89,6 +89,7 @@ class ExportBookingsView(APIView):
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
         status_filter = request.query_params.get("status")
+        date_by = request.query_params.get("date_by", "created_at")
 
         if start_date:
             try:
@@ -105,7 +106,7 @@ class ExportBookingsView(APIView):
                     {"error": "Invalid end_date format. Use YYYY-MM-DD"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
-        csv_data = export_bookings_to_csv(start_date, end_date, status_filter)
+        csv_data = export_bookings_to_csv(start_date, end_date, status_filter, date_by=date_by)
 
         response = HttpResponse(csv_data, content_type="text/csv")
         filename = f"bookings_export_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"

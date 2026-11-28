@@ -8,14 +8,20 @@ from apps.guests.models import Guest
 from apps.payments.models import Payment
 
 
-def export_bookings_to_csv(start_date=None, end_date=None, status=None):
+def export_bookings_to_csv(start_date=None, end_date=None, status=None, date_by="created_at"):
     """Export bookings data to CSV"""
     queryset = Booking.objects.select_related("guest", "room")
 
     if start_date:
-        queryset = queryset.filter(created_at__date__gte=start_date)
+        if date_by == "check_in":
+            queryset = queryset.filter(check_in_date__gte=start_date)
+        else:
+            queryset = queryset.filter(created_at__date__gte=start_date)
     if end_date:
-        queryset = queryset.filter(created_at__date__lte=end_date)
+        if date_by == "check_in":
+            queryset = queryset.filter(check_in_date__lte=end_date)
+        else:
+            queryset = queryset.filter(created_at__date__lte=end_date)
     if status:
         queryset = queryset.filter(status=status)
 
@@ -32,7 +38,7 @@ def export_bookings_to_csv(start_date=None, end_date=None, status=None):
             "Check-in Date",
             "Check-out Date",
             "Nights",
-            "Total Amount",
+            "Total Amount (ETB)",
             "Status",
             "Booking Source",
             "Created At",
@@ -43,9 +49,9 @@ def export_bookings_to_csv(start_date=None, end_date=None, status=None):
         writer.writerow(
             [
                 booking.booking_reference,
-                booking.guest.full_name,
-                booking.guest.phone_number,
-                booking.room.room_number,
+                booking.guest.full_name if booking.guest else "N/A",
+                booking.guest.phone_number if booking.guest else "N/A",
+                booking.room.room_number if booking.room else "N/A",
                 booking.check_in_date.strftime("%Y-%m-%d") if booking.check_in_date else "",
                 booking.check_out_date.strftime("%Y-%m-%d") if booking.check_out_date else "",
                 booking.total_nights,
@@ -79,7 +85,7 @@ def export_payments_to_csv(start_date=None, end_date=None, status=None):
             "Guest Name",
             "Guest Phone",
             "Booking Reference",
-            "Amount",
+            "Amount (ETB)",
             "Payment Type",
             "Payment Method",
             "Status",
@@ -132,7 +138,7 @@ def export_guests_to_csv(start_date=None, end_date=None):
             "Address",
             "Created At",
             "Total Bookings",
-            "Total Spent",
+            "Total Spent (ETB)",
         ]
     )
 

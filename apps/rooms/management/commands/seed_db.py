@@ -211,6 +211,16 @@ class Command(BaseCommand):
             name="Architecture & Grounds", defaults={"slug": "architecture", "display_order": 4}
         )
 
+        # Clean up legacy broken items with old titles or empty image fields
+        GalleryItem.objects.filter(
+            title__in=[
+                "Penthouse Ocean View Terrace",
+                "Luxury Spa & Heated Bath",
+                "Ocean View Balcony",
+            ]
+        ).delete()
+        GalleryItem.objects.filter(image="").delete()
+
         gallery_items_data = [
             {
                 "title": "Executive King Bedroom",

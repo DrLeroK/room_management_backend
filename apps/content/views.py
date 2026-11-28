@@ -412,7 +412,7 @@ class ContactInquiryStatsView(APIView):
     Staff view to get inquiry statistics.
     """
 
-    permission_classes = [IsAuthenticated, IsManagerRole]
+    permission_classes = [IsAuthenticated, IsReceptionistRole]
 
     def get(self, request):
         total = ContactInquiry.objects.count()
